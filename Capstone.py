@@ -5,6 +5,9 @@ import matplotlib.pyplot as plt
 import re, collections
 from sklearn.ensemble import RandomForestRegressor
 from itertools import chain
+import nltk
+from nltk.tokenize import sent_tokenize
+from nltk.tokenize import word_tokenize
 
 #df = pd.read_excel("/Users/pengluyao/.kaggle/training_set_rel3.xls")
 
@@ -39,6 +42,21 @@ total_len = list(chain(*total_len))
 df['total_len'] = pd.Series(total_len)
 
 df.boxplot(column = 'total_len', by = 'essay_set', figsize = (10, 10))
+
+#get word count discarding punctuations:
+def get_word_count(essay):
+    return len(re.findall(r"\s", essay))+1
+
+# get sentence
+def sent_num(essay):
+    sentences_num = len(sent_tokenize(essay))
+    return sentences_num
+
+#get sentence length:
+def sent_len(essay):
+    sentence = sent_tokenize(essay)
+    sentence_len = len(word_tokenize(sentence))
+    return sentence_len
 
 def get_total_length(essay):
     return len(essay)
