@@ -6,8 +6,9 @@ import re, collections
 from sklearn.ensemble import RandomForestRegressor
 from itertools import chain
 
-df = pd.read_excel("/Users/pengluyao/.kaggle/training_set_rel3.xls")
-#df = pd.read_excel("training_set_rel3.xls")
+#df = pd.read_excel("/Users/pengluyao/.kaggle/training_set_rel3.xls")
+
+df = pd.read_excel("training_set_rel3.xls")
 
 names = list(df.columns.values)
 data = df[['essay_set','essay','domain1_score']].copy()
