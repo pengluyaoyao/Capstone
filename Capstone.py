@@ -98,6 +98,59 @@ def main():
 
 
 
+import nltk
+from bs4 import BeautifulSoup
+import requests
+page = requests.get("http://www.newyorksocialdiary.com/party-pictures/2015/celebrating-the-neighborhood")
+soup = BeautifulSoup(page.text, "lxml")
+captions = soup.find_all('div', attrs={'class':'photocaption'})
+captions.append(soup.find_all('td', attrs={'class':'photocaption'}))
+
+def get_captions(path):
+    page = requests.get(path)
+    soup = BeautifulSoup(page.text,'lxml')
+    names = [c.get_text() for c in soup.find_all('div', attrs={'class':'photocaption'})]
+    #captions = soup.find_all('div', attrs={'class':'photocaption'})
+    #captions.append(soup.find_all('td', attrs={'class':'photocaption'}))
+    #for i in np.arange(0,len(captions)):
+        #names.append(captions[i].text)
+    #names.append(c.get_text() for c in soup.find_all('td', attrs={'class':'photocaption'}))
+    return names
+
+import spacy
+captions = get_captions("http://www.newyorksocialdiary.com/party-pictures/2015/celebrating-the-neighborhood")
+caption=captions[0]
+
+
+nlp = spacy.load('en_core_web_sm', disable=['textcat','parser', 'tagger'])
+doc = nlp(caption)
+
+names = []
+for token in doc.ents:
+    if token.label_ =='PERSON' and len(token)>1:
+        name = token.text.strip()
+        names.append(name)
+
+
+
+def extract_entity_names_NE(t):
+    entity_names = []
+    if hasattr(t, 'label') and t.label:
+        if t.label() == 'NE':
+            entity_names.append(' '.join([child[0] for child in t]))
+        else:
+            for child in t:
+                entity_names.extend(extract_entity_names_NE(child))
+    return entity_names
+
+
+import networkx as nx
+from collections import Counter
+
+
+
+
+
 
 
 
