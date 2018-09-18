@@ -8,6 +8,9 @@ from itertools import chain
 import nltk
 from nltk.tokenize import sent_tokenize
 from nltk.tokenize import word_tokenize
+import string
+from nltk.stem import WordNetLemmatizer
+from nltk.corpus import wordnet
 
 #df = pd.read_excel("/Users/pengluyao/.kaggle/training_set_rel3.xls")
 
@@ -15,7 +18,7 @@ df = pd.read_excel("training_set_rel3.xls")
 
 names = list(df.columns.values)
 data = df[['essay_set','essay','domain1_score']].copy()
-print(data)
+#print(data)
 
 df.set_index('essay_id')
 df.boxplot(column = 'domain1_score', by = 'essay_set', figsize = (10, 10))
@@ -23,12 +26,13 @@ df.boxplot(column = 'domain1_score', by = 'essay_set', figsize = (10, 10))
 #get the essays and essay_set into dictionary
 train_data = {}
 for index, row in df.iterrows():
-    essay = row["essay"].strip().split(" ")
+    essay = row["essay"].strip()#.split(" ")
     essay_set = row['essay_set']
     domain1_score = row['domain1_score']/2
     length = len(essay)
     if essay_set not in train_data:
         train_data[essay_set] = {"essay":[], "score":[], "length":[]}
+
     train_data[essay_set]["essay"].append(essay)
     train_data[essay_set]['score'].append(domain1_score)
     train_data[essay_set]['length'].append(length)
@@ -43,23 +47,111 @@ df['total_len'] = pd.Series(total_len)
 
 df.boxplot(column = 'total_len', by = 'essay_set', figsize = (10, 10))
 
+#essay1 = train_data[1]['essay'][0]
+
+###PREPERATIONS
+exclude = set(string.punctuation)
+  #each period is a sentence
+
+
+#def excluding_punctuation(essay):
+ #   essay_no_punct = ''.join(ch for ch in essay if ch not in exclude)
+  #  return essay_no_punct
+
+def sentence_to_wordlist(raw_sentence):
+    clean_sentence = re.sub("[^a-zA-Z0-9]", " ", raw_sentence)
+    tokens = nltk.word_tokenize(clean_sentence)
+
+    return tokens
+
+
+def tokenize(essay):
+    stripped_essay = essay.strip()
+
+    tokenizer = nltk.data.load('tokenizers/punkt/english.pickle')
+    raw_sentences = tokenizer.tokenize(stripped_essay)
+
+    tokenized_sentences = []
+    for raw_sentence in raw_sentences:
+        if len(raw_sentence) > 0:
+            tokenized_sentences.append(sentence_to_wordlist(raw_sentence))
+
+    return tokenized_sentences
+
+#get list of sentences:
+def get_sent_list(essay):
+    sent_list = []
+    sentences = nltk.sent_tokenize(essay)
+    for sentence in sentences:
+        sent_list.append(''.join([ch for ch in sentence if ch not in exclude]))
+    return sent_list
+
+#####FEATURE EXTRACTION FUNCTIONS
 #get word count discarding punctuations:
-def get_word_count(essay):
-    return len(re.findall(r"\s", essay))+1
+def total_word_count(essay): #excluding punctuations
+    list_of_word_list = tokenize(essay)
+    return len(list_of_word_list)
 
 # get sentence
-def sent_num(essay):
+def sent_num(essay):  #number of sentences in an essay
     sentences_num = len(sent_tokenize(essay))
     return sentences_num
 
-#get sentence length:
-def sent_len(essay):
-    sentence = sent_tokenize(essay)
-    sentence_len = len(word_tokenize(sentence))
-    return sentence_len
+def word_feature(essay): #average word count and std of word count in sentence, avg word length throughout an essay
+    word_len =[]
+    words_in_sent = tokenize(essay)
+    for sent in words_in_sent:
+        word_len.extend([len(word) for word in sent])
+    avg_word_len = np.mean(word_len)
+    word_count_per_sentence = [len(s) for s in words_in_sent]
+    avg_wordcount = np.mean(word_count_per_sentence)
+    std_word_count =  np.std(word_count_per_sentence) #by sentence
+    return [avg_word_len, avg_wordcount, std_word_count]
 
-def get_total_length(essay):
-    return len(essay)
+
+##number of lemmas:
+def count_lemmas(essay):
+    tokenized_sentences = tokenize(essay)
+
+    lemmas = []
+    wordnet_lemmatizer = WordNetLemmatizer()
+
+    for sentence in tokenized_sentences:
+        tagged_tokens = nltk.pos_tag(sentence)
+
+        for token_tuple in tagged_tokens:
+
+            pos_tag = token_tuple[1]
+
+            if pos_tag.startswith('N'):
+                pos = wordnet.NOUN
+                lemmas.append(wordnet_lemmatizer.lemmatize(token_tuple[0], pos))
+            elif pos_tag.startswith('J'):
+                pos = wordnet.ADJ
+                lemmas.append(wordnet_lemmatizer.lemmatize(token_tuple[0], pos))
+            elif pos_tag.startswith('V'):
+                pos = wordnet.VERB
+                lemmas.append(wordnet_lemmatizer.lemmatize(token_tuple[0], pos))
+            elif pos_tag.startswith('R'):
+                pos = wordnet.ADV
+                lemmas.append(wordnet_lemmatizer.lemmatize(token_tuple[0], pos))
+            else:
+                pos = wordnet.NOUN
+                lemmas.append(wordnet_lemmatizer.lemmatize(token_tuple[0], pos))
+
+    lemma_count = len(set(lemmas))
+
+    return lemma_count
+
+##Spellilng errors
+
+
+
+##adding tags
+##sentiment analysis: topic mining. N-gram
+
+
+#
 
 def extract_features(essays, feature_functions):
     return [[f(es) for f in feature_functions] for es in essays]
@@ -146,10 +238,6 @@ def extract_entity_names_NE(t):
 
 import networkx as nx
 from collections import Counter
-
-
-
-
 
 
 
