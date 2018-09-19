@@ -4,6 +4,7 @@ import xlrd
 import matplotlib.pyplot as plt
 import re, collections
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.feature_extraction.text import TfidfVectorizer
 from itertools import chain
 import nltk
 from nltk.tokenize import sent_tokenize
@@ -49,7 +50,11 @@ df.boxplot(column = 'total_len', by = 'essay_set', figsize = (10, 10))
 
 #essay1 = train_data[1]['essay'][0]
 
-###PREPERATIONS
+################################################
+##################PREPERATIONS##################
+################################################
+
+
 exclude = set(string.punctuation)
   #each period is a sentence
 
@@ -78,15 +83,26 @@ def tokenize(essay):
 
     return tokenized_sentences
 
+
+def get_clean_essay(essay):
+    clean_essay = re.sub(r'\W', ' ', essay)
+    return clean_essay
+
 #get list of sentences:
 def get_sent_list(essay):
     sent_list = []
     sentences = nltk.sent_tokenize(essay)
     for sentence in sentences:
-        sent_list.append(''.join([ch for ch in sentence if ch not in exclude]))
+        clean_sentence = re.sub(r'\W', ' ', str(sentence).lower())
+        clean_sentence = re.sub(r'[0-9]', '', clean_sentence)
+
+        sent_list.append(clean_sentence)
     return sent_list
 
-#####FEATURE EXTRACTION FUNCTIONS
+#######################################
+#####FEATURE EXTRACTION FUNCTIONS######
+#######################################
+
 #get word count discarding punctuations:
 def total_word_count(essay): #excluding punctuations
     list_of_word_list = tokenize(essay)
@@ -143,18 +159,82 @@ def count_lemmas(essay):
 
     return lemma_count
 
-##Spellilng errors
 
+##BOW
+def BOW(essay): ##essay is in the format of df[df['essay_set'] == 1]['essay']
+    #sentence = nltk.sent_tokenize(essay)  ##
+    vectorizer = TfidfVectorizer(ngram_range=(1, 2), max_df=1.0, min_df=1, max_features=10000,stop_words='english')
+    feature_matrix = vectorizer.fit_transform(essay)
+    feature_names = vectorizer.get_feature_names()
+    return feature_names, feature_matrix
 
+##Spelllng errors
+def count_spell_error(essay):
+    clean_essay = re.sub(r'\W', ' ', str(essay).lower())
+    clean_essay = re.sub(r'[0-9]', '', clean_essay)
 
+    big = open('big.txt').read()
+
+    words_ = re.findall('[a-z]+', big.lower())
+
+    big_dict = collections.defaultdict(lambda: 0)
+    #creating correct word dictionary
+    for word in words_:
+        big_dict[word] += 1
+
+    mispell_count = 0
+
+    words = clean_essay.split()
+
+    for word in words:
+        if not word in big_dict:
+            mispell_count += 1
+
+    return mispell_count
+
+###Number of Nouns, Verbs, adj, adv. in an essay
+def count_pos(essay):
+    tokenized_sentences = tokenize(essay)
+
+    noun_count = 0
+    adj_count = 0
+    verb_count = 0
+    adv_count = 0
+
+    for sentence in tokenized_sentences:
+        tagged_tokens = nltk.pos_tag(sentence)
+
+        for token_tuple in tagged_tokens:
+            pos_tag = token_tuple[1]
+
+            if pos_tag.startswith('N'):
+                noun_count += 1
+            elif pos_tag.startswith('J'):
+                adj_count += 1
+            elif pos_tag.startswith('V'):
+                verb_count += 1
+            elif pos_tag.startswith('R'):
+                adv_count += 1
+
+    return noun_count, adj_count, verb_count, adv_count
 ##adding tags
 ##sentiment analysis: topic mining. N-gram
 
-
-#
-
 def extract_features(essays, feature_functions):
     return [[f(es) for f in feature_functions] for es in essays]
+
+feature_functions = [total_word_count, sent_num, word_feature, count_lemmas, count_spell_error, count_pos]
+
+essay_sets = sorted(train_data.keys())
+
+BOW_dict={}
+for es_set in essay_sets:
+
+    print("Making Predictions for Essay Set %s" % es_set)
+    features = extract_features(train_data[es_set]["essay"],
+                                    feature_functions)
+
+
 
 
 def main():
@@ -163,7 +243,7 @@ def main():
     print("Reading Validation Data")
     test = read_test_data("../Data/valid_set.tsv")
 
-    feature_functions = [get_character_count, get_word_count]
+    feature_functions = [total_word_count, sent_num, word_feature, count_lemmas, BOW, count_spell_error, count_pos]
 
     essay_sets = sorted(training.keys())
     predictions = {}
