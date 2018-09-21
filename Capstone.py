@@ -12,7 +12,7 @@ from nltk.tokenize import word_tokenize
 import string
 from nltk.stem import WordNetLemmatizer
 from nltk.corpus import wordnet
-
+from collections import defaultdict
 #df = pd.read_excel("/Users/pengluyao/.kaggle/training_set_rel3.xls")
 
 df = pd.read_excel("training_set_rel3.xls")
@@ -30,23 +30,11 @@ for index, row in df.iterrows():
     essay = row["essay"].strip()#.split(" ")
     essay_set = row['essay_set']
     domain1_score = row['domain1_score']/2
-    length = len(essay)
     if essay_set not in train_data:
-        train_data[essay_set] = {"essay":[], "score":[], "length":[]}
+        train_data[essay_set] = {"essays":[], "score":[]}
 
-    train_data[essay_set]["essay"].append(essay)
+    train_data[essay_set]["essays"].append(essay)
     train_data[essay_set]['score'].append(domain1_score)
-    train_data[essay_set]['length'].append(length)
-
-total_len = []
-for set in range(1,9):
-    len_by_set = train_data[set]["length"]
-    total_len.append(len_by_set)
-
-total_len = list(chain(*total_len))
-df['total_len'] = pd.Series(total_len)
-
-df.boxplot(column = 'total_len', by = 'essay_set', figsize = (10, 10))
 
 #essay1 = train_data[1]['essay'][0]
 
@@ -55,7 +43,7 @@ df.boxplot(column = 'total_len', by = 'essay_set', figsize = (10, 10))
 ################################################
 
 
-exclude = set(string.punctuation)
+#exclude = set(string.punctuation)
   #each period is a sentence
 
 
@@ -99,6 +87,18 @@ def get_sent_list(essay):
         sent_list.append(clean_sentence)
     return sent_list
 
+def get_big_dict():
+    big = open('big.txt').read()
+
+    words_ = re.findall('[a-z]+', big.lower())
+
+    big_dict = collections.defaultdict(lambda: 0)
+    #creating correct word dictionary
+    for word in words_:
+        big_dict[word] += 1
+    return(big_dict)
+
+
 #######################################
 #####FEATURE EXTRACTION FUNCTIONS######
 #######################################
@@ -106,7 +106,8 @@ def get_sent_list(essay):
 #get word count discarding punctuations:
 def total_word_count(essay): #excluding punctuations
     list_of_word_list = tokenize(essay)
-    return len(list_of_word_list)
+    flat_list_of_word = [w for l in list_of_word_list for w in l]
+    return len(flat_list_of_word)
 
 # get sentence
 def sent_num(essay):  #number of sentences in an essay
@@ -173,15 +174,6 @@ def count_spell_error(essay):
     clean_essay = re.sub(r'\W', ' ', str(essay).lower())
     clean_essay = re.sub(r'[0-9]', '', clean_essay)
 
-    big = open('big.txt').read()
-
-    words_ = re.findall('[a-z]+', big.lower())
-
-    big_dict = collections.defaultdict(lambda: 0)
-    #creating correct word dictionary
-    for word in words_:
-        big_dict[word] += 1
-
     mispell_count = 0
 
     words = clean_essay.split()
@@ -221,18 +213,111 @@ def count_pos(essay):
 ##sentiment analysis: topic mining. N-gram
 
 def extract_features(essays, feature_functions):
-    return [[f(es) for f in feature_functions] for es in essays]
+    return [[f(es) for f in feature_functions] for es in essays] ##list of list of features for each essay
 
 feature_functions = [total_word_count, sent_num, word_feature, count_lemmas, count_spell_error, count_pos]
 
 essay_sets = sorted(train_data.keys())
 
-BOW_dict={}
-for es_set in essay_sets:
+#BOW_dict={}
+keys = [1,2,3,4,5,6,7,8]
+features = {key: [] for key in keys}
+big_dict = get_big_dict()
+for es_set in keys:
+    #if es_set not in BOW_dict:
+     #   BOW_dict={'es_set':[]}
+    #BOW_dict['es_set'].append([get_clean_essay(essay) for essay in train_data[es_set]['essays']])
 
-    print("Making Predictions for Essay Set %s" % es_set)
-    features = extract_features(train_data[es_set]["essay"],
-                                    feature_functions)
+    print("Extracting Features for Essay Set %s" % es_set)
+    #if es_set not in features:
+        #features={es_set :[]}
+    features[es_set].extend(extract_features(train_data[es_set]["essays"], feature_functions))
+
+new_keys = ["total word_count","sentence_number","word_features","count_lemma","spelling_error","count_pos"]
+Dict = {key: defaultdict(list) for key in new_keys}
+for key, value in features.items():
+    for v in value:
+        Dict['total word_count']['essay_set %s' % key].append(v[0])
+        Dict['sentence_number']['essay_set %s' % key].append(v[1])
+        Dict['word_features']['essay_set %s' % key].append(v[2])
+        Dict['count_lemma']['essay_set %s' % key].append(v[3])
+        Dict['spelling_error']['essay_set %s' % key].append(v[4])
+        Dict['count_pos']['essay_set %s' % key].append(v[5])
+
+###box plot for word count:
+from bkcharts import BoxPlot, output_file, show
+from bokeh.layouts import row
+from numpy import linspace
+from scipy.stats.kde import gaussian_kde
+
+from bokeh.io import output_file, show
+from bokeh.models import ColumnDataSource, FixedTicker, PrintfTickFormatter, Select
+
+from bokeh.plotting import figure
+from bokeh.sampledata.perceptions import probly
+from bokeh.io import curdoc
+import colorcet as cc
+from bokeh.layouts import widgetbox, row
+
+
+
+word_count_dict = Dict['total word_count']
+sentence_number_dict = Dict['sentence_number']
+word_features_dict = Dict['word_features']
+count_lemma_dict = Dict['count_lemma']
+spelling_error_dict = Dict['spelling_error']
+count_pos_dict = Dict['count_pos']
+
+# word_count=[]
+# Essay_sets=[]
+# for key in word_count_dict:
+#     n = len(word_count_dict[key])
+#     word_count.extend(word_count_dict[key])
+#     Essay_sets.extend(np.repeat(key, n))
+
+# df_word_count = pd.DataFrame({'Essay sets': Essay_sets, 'word count': word_count})
+
+def joy(category, data, scale=15):
+    return list(zip([category]*len(data), scale*data))
+
+cats = ['essay_set %s' % s for s in np.arange(1,9)]
+
+palette = [cc.rainbow[i*15] for i in range(17)]
+
+
+def update_plot(attr, old, new):
+    feature_dict = Dict[select1.value]
+
+    xmax = max([max(n) for n in feature_dict])
+
+    x = linspace(0, xmax, 500)
+
+    Data = {'x': x}
+    source = ColumnDataSource(Data)
+
+    p = figure(y_range=cats, plot_width=900, x_range=(-5, xmax), toolbar_location=None)
+
+
+
+    for i, cat in enumerate(cats):
+        pdf = gaussian_kde(feature_dict[cat])
+        y = joy(cat, pdf(x))
+        source.add(y, cat)
+        p.patch('x', cat, color=palette[i], alpha=0.6, line_color="black", source=source)
+
+
+select1 = Select(value='total word_count', title='Features',
+                 options=['total word_count', 'spelling_error', 'count_lemma', 'sentence_number'])
+
+select1.on_change('value', update_plot)
+
+
+layout = row(select1, p)
+
+curdoc().add_root(layout)
+
+
+###############################################
 
 
 
