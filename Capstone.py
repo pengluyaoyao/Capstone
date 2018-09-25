@@ -17,12 +17,12 @@ from collections import defaultdict
 
 df = pd.read_excel("training_set_rel3.xls")
 
-names = list(df.columns.values)
-data = df[['essay_set','essay','domain1_score']].copy()
-#print(data)
+#names = list(df.columns.values)
+#data = df[['essay_set','essay','domain1_score']].copy()
+##print(data)
 
-df.set_index('essay_id')
-df.boxplot(column = 'domain1_score', by = 'essay_set', figsize = (10, 10))
+#df.set_index('essay_id')
+#df.boxplot(column = 'domain1_score', by = 'essay_set', figsize = (10, 10))
 
 #get the essays and essay_set into dictionary
 train_data = {}
@@ -162,12 +162,73 @@ def count_lemmas(essay):
 
 
 ##BOW
-def BOW(essay): ##essay is in the format of df[df['essay_set'] == 1]['essay']
+from sklearn.feature_extraction.text import HashingVectorizer
+
+
+def BOW1(essays):
+    TOKENS_ALPHANUMERIC = '[A-Za-z0-9]+(?=\\s+)'
+    hashing_vec = HashingVectorizer(token_pattern=TOKENS_ALPHANUMERIC, non_negative=True, norm=None, binary=False, ngram_range=(1, 2),stop_words='english')
+    hashed_text = hashing_vec.fit_transform(essays)
+    hashed_df = pd.DataFrame(hashed_text.data)
+    print(hashed_df.head())
+
+
+def BOW2(essay): ##essay is in the format of df[df['essay_set'] == 1]['essay']
     #sentence = nltk.sent_tokenize(essay)  ##
     vectorizer = TfidfVectorizer(ngram_range=(1, 2), max_df=1.0, min_df=1, max_features=10000,stop_words='english')
     feature_matrix = vectorizer.fit_transform(essay)
     feature_names = vectorizer.get_feature_names()
     return feature_names, feature_matrix
+
+from sklearn.decomposition import NMF
+
+def print_top_words(model, feature_names, n_top_words):
+    for topic_idx, topic in enumerate(model.components_):
+        message = "Topic #%d: " % topic_idx
+        message += " ".join([feature_names[i]
+                             for i in topic.argsort()[:-n_top_words - 1:-1]])
+        print(message)
+    print()
+
+n_samples = 2000
+n_features = 1000
+n_components = 10
+n_top_words = 20
+
+loadings=[]
+for k in train_data:
+    essays = train_data[k]['essays']
+    tfidf_vectorizer = TfidfVectorizer(max_df=0.95, min_df=2,
+                                       max_features=n_features,
+                                       stop_words='english')
+    tfidf = tfidf_vectorizer.fit_transform(essays)
+    tfidfarray = tfidf.toarray()
+
+    nmf = NMF(n_components=n_components, random_state=1,
+              alpha=.1, l1_ratio=.5).fit(tfidf)
+
+    loadings.append(np.matmul(tfidfarray, np.transpose(nmf.components_))) #loadings is list of lists
+
+
+
+#tfidf_feature_names = tfidf_vectorizer.get_feature_names()
+#print_top_words(nmf, tfidf_feature_names, n_top_words)
+
+#######Example of NMF###########################################
+#from sklearn.datasets import fetch_20newsgroups
+#dataset = fetch_20newsgroups(shuffle=True, random_state=1,
+#                             remove=('headers', 'footers', 'quotes'))
+
+#data_samples = dataset.data[:n_samples]
+#tfidf_vectorizer = TfidfVectorizer(max_df=0.95, min_df=2,
+#                                  max_features=n_features,
+#                                  stop_words='english')
+#tfidf = tfidf_vectorizer.fit_transform(data_samples)
+#nmf = NMF(n_components=n_components, random_state=1,
+#          alpha=.1, l1_ratio=.5).fit(tfidf)
+#tfidf_feature_names = tfidf_vectorizer.get_feature_names()
+#print_top_words(nmf, tfidf_feature_names, n_top_words)
+###############################################################
 
 ##Spelllng errors
 def count_spell_error(essay):
@@ -244,15 +305,85 @@ for key, value in features.items():
         Dict['spelling_error']['essay_set %s' % key].append(v[4])
         Dict['count_pos']['essay_set %s' % key].append(v[5])
 
-###box plot for word count:
+#######################################################
+import dill
+
+Dict = dill.load(open('featurs_dict.pkd', 'rb'))
+features = dill.load(open('features.pkd', 'rb'))
+Dict['total word_count'].pop('0',None)
+
+#######################################################
+#######CREATING DF OF FEATURES AND LABELS##############
+#######################################################
+dict_todf = {}
+
+for Key in Dict:
+    dict_todf[Key]=[]
+    for key in Dict[Key]:
+        if Dict[Key][key]!=[]:
+            dict_todf[Key].extend(Dict[Key][key])
+
+
+
+feature_df = pd.DataFrame.from_dict(dict_todf)
+
+###open tuple and list in feature_df
+count_tag = {'noun_count':[], 'adj_count':[], 'verb_count':[], 'adv_count':[]}
+for t in feature_df['count_pos'].iteritems():
+    count_tag['noun_count'].append(t[1][0])
+    count_tag['adj_count'].append(t[1][1])
+    count_tag['verb_count'].append(t[1][2])
+    count_tag['adv_count'].append(t[1][3])
+
+count_tag_df = pd.DataFrame.from_dict(count_tag)
+
+word_features_ = {'avg_word_len':[], 'avg_wordcount':[], 'std_word_count':[]}
+for l in feature_df['word_features'].iteritems():
+    word_features_['avg_word_len'].append(l[1][0])
+    word_features_['avg_wordcount'].append(l[1][1])
+    word_features_['std_word_count'].append(l[1][2])
+
+word_features_df = pd.DataFrame.from_dict(word_features_)
+
+from collections import OrderedDict
+
+
+components = ['c1','c2','c3','c4','c5','c6','c7','c8','c9','c10']
+
+comp_dict = OrderedDict([(c,[]) for c in components])
+
+L = np.arange(0,8)
+col=0
+for c in comp_dict:
+    for l in L:
+        comp_by_set = loadings[l][:, col].tolist()
+        comp_dict[c].extend(comp_by_set)
+    col +=1
+
+BOW_loading_df = pd.DataFrame.from_dict(comp_dict)
+
+full_features_df = pd.concat([feature_df, count_tag_df, word_features_df, BOW_loading_df], axis=1)
+
+
+
+############################################
+##########MULTICLASS CLASSIFICATIONS########
+############################################
+'''
+n_components can be tuned
+'''
+
+
+############################################
+######Bokeh for word count:#################
+############################################
+
 from bkcharts import BoxPlot, output_file, show
 from bokeh.layouts import row
 from numpy import linspace
 from scipy.stats.kde import gaussian_kde
-
 from bokeh.io import output_file, show
 from bokeh.models import ColumnDataSource, FixedTicker, PrintfTickFormatter, Select
-
 from bokeh.plotting import figure
 from bokeh.sampledata.perceptions import probly
 from bokeh.io import curdoc
@@ -267,54 +398,6 @@ word_features_dict = Dict['word_features']
 count_lemma_dict = Dict['count_lemma']
 spelling_error_dict = Dict['spelling_error']
 count_pos_dict = Dict['count_pos']
-
-# word_count=[]
-# Essay_sets=[]
-# for key in word_count_dict:
-#     n = len(word_count_dict[key])
-#     word_count.extend(word_count_dict[key])
-#     Essay_sets.extend(np.repeat(key, n))
-
-# df_word_count = pd.DataFrame({'Essay sets': Essay_sets, 'word count': word_count})
-
-def joy(category, data, scale=15):
-    return list(zip([category]*len(data), scale*data))
-
-cats = ['essay_set %s' % s for s in np.arange(1,9)]
-
-palette = [cc.rainbow[i*15] for i in range(17)]
-
-
-def update_plot(attr, old, new):
-    feature_dict = Dict[select1.value]
-
-    xmax = max([max(n) for n in feature_dict])
-
-    x = linspace(0, xmax, 500)
-
-    Data = {'x': x}
-    source = ColumnDataSource(Data)
-
-    p = figure(y_range=cats, plot_width=900, x_range=(-5, xmax), toolbar_location=None)
-
-
-
-    for i, cat in enumerate(cats):
-        pdf = gaussian_kde(feature_dict[cat])
-        y = joy(cat, pdf(x))
-        source.add(y, cat)
-        p.patch('x', cat, color=palette[i], alpha=0.6, line_color="black", source=source)
-
-
-select1 = Select(value='total word_count', title='Features',
-                 options=['total word_count', 'spelling_error', 'count_lemma', 'sentence_number'])
-
-select1.on_change('value', update_plot)
-
-
-layout = row(select1, p)
-
-curdoc().add_root(layout)
 
 
 ###############################################
