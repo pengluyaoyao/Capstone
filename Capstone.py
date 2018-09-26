@@ -175,7 +175,7 @@ def BOW1(essays):
 
 def BOW2(essay): ##essay is in the format of df[df['essay_set'] == 1]['essay']
     #sentence = nltk.sent_tokenize(essay)  ##
-    vectorizer = TfidfVectorizer(ngram_range=(1, 2), max_df=1.0, min_df=1, max_features=10000,stop_words='english')
+    vectorizer = TfidfVectorizer(ngram_range=(1, 2), max_df=1.0, min_df=1, max_features=1000,stop_words='english')
     feature_matrix = vectorizer.fit_transform(essay)
     feature_names = vectorizer.get_feature_names()
     return feature_names, feature_matrix
@@ -192,7 +192,7 @@ def print_top_words(model, feature_names, n_top_words):
 
 n_samples = 2000
 n_features = 1000
-n_components = 10
+n_components = 20
 n_top_words = 20
 
 loadings=[]
@@ -328,6 +328,8 @@ for Key in Dict:
 feature_df = pd.DataFrame.from_dict(dict_todf)
 
 ###open tuple and list in feature_df
+
+####count of noun etc df, open tuple
 count_tag = {'noun_count':[], 'adj_count':[], 'verb_count':[], 'adv_count':[]}
 for t in feature_df['count_pos'].iteritems():
     count_tag['noun_count'].append(t[1][0])
@@ -337,6 +339,7 @@ for t in feature_df['count_pos'].iteritems():
 
 count_tag_df = pd.DataFrame.from_dict(count_tag)
 
+####word features df, open list
 word_features_ = {'avg_word_len':[], 'avg_wordcount':[], 'std_word_count':[]}
 for l in feature_df['word_features'].iteritems():
     word_features_['avg_word_len'].append(l[1][0])
@@ -345,10 +348,11 @@ for l in feature_df['word_features'].iteritems():
 
 word_features_df = pd.DataFrame.from_dict(word_features_)
 
+
+#####NMF loading df
 from collections import OrderedDict
 
-
-components = ['c1','c2','c3','c4','c5','c6','c7','c8','c9','c10']
+components = ['c1','c2','c3','c4','c5','c6','c7','c8','c9','c10','c11','c12','c13','c14','c15','c16','c17','c18','c19','c20']
 
 comp_dict = OrderedDict([(c,[]) for c in components])
 
@@ -362,9 +366,33 @@ for c in comp_dict:
 
 BOW_loading_df = pd.DataFrame.from_dict(comp_dict)
 
-full_features_df = pd.concat([feature_df, count_tag_df, word_features_df, BOW_loading_df], axis=1)
+####Using original tfidfarray instead of loadings on 10 components by NMF
 
+essays = train_data[1]['essays']
+tfidf_vectorizer = TfidfVectorizer(max_df=0.95, min_df=2,
+                                   max_features=n_features,
+                                   stop_words='english')
+tfidf = tfidf_vectorizer.fit_transform(essays)
+tfidfarray = tfidf.toarray()  ##1783*1000 array
 
+def ArrayToDict(array):  ##for one essay set
+    words = tfidf_vectorizer.get_feature_names()
+    word_dict = OrderedDict([(w,[]) for w in words])
+    L=np.arange(0,array.shape[0])
+    col=0
+    for w in word_dict:
+        word_freq = array[:,col].tolist()
+        word_dict[w].extend(word_freq)
+    col+=1
+    return word_dict
+
+word_dict = ArrayToDict(tfidfarray)
+BOW_freq_df = pd.DataFrame.from_dict(word_dict)
+
+##########Full features df
+full_features_df = pd.concat([df['essay_set'], feature_df, count_tag_df, word_features_df, BOW_freq_df], axis=1)
+
+labels =pd.concat([df['essay_set'], df['domain1_score']], axis=1)
 
 ############################################
 ##########MULTICLASS CLASSIFICATIONS########
@@ -372,6 +400,36 @@ full_features_df = pd.concat([feature_df, count_tag_df, word_features_df, BOW_lo
 '''
 n_components can be tuned
 '''
+from sklearn.linear_model import Ridge
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.multiclass import OneVsRestClassifier
+from sklearn.pipeline import Pipeline
+from sklearn.model_selection import cross_val_score, GridSearchCV
+
+clf1 = RandomForestRegressor(n_estimators=170, max_depth=5, min_samples_leaf=50, random_state=2)
+clf2 = Ridge(alpha=20)
+#scores=[]
+#sets = np.arange(1,9)
+#for set in sets:
+
+n_estimators = np.arange(170, 180, 5)
+max_depth=np.arange(5, 20, 5)
+min_samples_leaf = np.arange(50,70,10)
+
+param_grid = dict(n_estimators=n_estimators, max_depth=max_depth, min_samples_leaf=min_samples_leaf)
+
+alpha = np.arange(15,25,2)
+
+X_train = full_features_df[full_features_df['essay_set']==1]
+X_train = X_train.drop(['essay_set', 'count_pos', 'word_features'], axis=1)
+X_train = X_train.as_matrix()  ##X_train is an np array
+y_train = labels[labels['essay_set']==1]['domain1_score'].tolist() ##y_train is a list
+estimator = GridSearchCV(clf2, dict(alpha=alpha))
+estimator.fit(X_train, y_train)
+
+estimator.best_estimator_
+estimator.best_score_
+
 
 
 ############################################
