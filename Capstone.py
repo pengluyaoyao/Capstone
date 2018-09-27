@@ -191,7 +191,7 @@ def print_top_words(model, feature_names, n_top_words):
     print()
 
 n_samples = 2000
-n_features = 1000
+n_features = 100
 n_components = 20
 n_top_words = 20
 
@@ -270,8 +270,6 @@ def count_pos(essay):
                 adv_count += 1
 
     return noun_count, adj_count, verb_count, adv_count
-##adding tags
-##sentiment analysis: topic mining. N-gram
 
 def extract_features(essays, feature_functions):
     return [[f(es) for f in feature_functions] for es in essays] ##list of list of features for each essay
@@ -313,7 +311,7 @@ features = dill.load(open('features.pkd', 'rb'))
 Dict['total word_count'].pop('0',None)
 
 #######################################################
-#######CREATING DF OF FEATURES AND LABELS##############
+#######CREATING DATAFRAME OF FEATURES AND LABELS#######
 #######################################################
 dict_todf = {}
 
@@ -368,69 +366,122 @@ BOW_loading_df = pd.DataFrame.from_dict(comp_dict)
 
 ####Using original tfidfarray instead of loadings on 10 components by NMF
 
-essays = train_data[1]['essays']
-tfidf_vectorizer = TfidfVectorizer(max_df=0.95, min_df=2,
+def BOWvectorizer_toDict(essays):
+    tfidf_vectorizer = TfidfVectorizer(max_df=0.95, min_df=2,
                                    max_features=n_features,
                                    stop_words='english')
-tfidf = tfidf_vectorizer.fit_transform(essays)
-tfidfarray = tfidf.toarray()  ##1783*1000 array
-
-def ArrayToDict(array):  ##for one essay set
+    tfidf = tfidf_vectorizer.fit_transform(essays)
+    tfidfarray = tfidf.toarray()  ##n_essays in each set *n_features array
     words = tfidf_vectorizer.get_feature_names()
     word_dict = OrderedDict([(w,[]) for w in words])
-    L=np.arange(0,array.shape[0])
     col=0
     for w in word_dict:
-        word_freq = array[:,col].tolist()
+        word_freq = tfidfarray[:,col].tolist()
         word_dict[w].extend(word_freq)
     col+=1
     return word_dict
 
-word_dict = ArrayToDict(tfidfarray)
-BOW_freq_df = pd.DataFrame.from_dict(word_dict)
+full_word_dict = {}
+sets=np.arange(1,9)
+for set in sets:
+    essays = train_data[set]['essays']
+    word_dict = BOWvectorizer_toDict(essays)
+    full_word_dict[set]=word_dict
 
 ##########Full features df
-full_features_df = pd.concat([df['essay_set'], feature_df, count_tag_df, word_features_df, BOW_freq_df], axis=1)
+full_features_df = pd.concat([df['essay_set'], feature_df, count_tag_df, word_features_df], axis=1)
 
 labels =pd.concat([df['essay_set'], df['domain1_score']], axis=1)
 
-############################################
-##########MULTICLASS CLASSIFICATIONS########
-############################################
+############################################################################
+##########   ML REGRESSION INITIALIZATION   ################################
+############################################################################
 '''
 n_components can be tuned
 '''
-from sklearn.linear_model import Ridge
+from sklearn.linear_model import Ridge, LinearRegression, Lasso
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.multiclass import OneVsRestClassifier
-from sklearn.pipeline import Pipeline
 from sklearn.model_selection import cross_val_score, GridSearchCV
+from sklearn.metrics import cohen_kappa_score
+from sklearn import ensemble
 
-clf1 = RandomForestRegressor(n_estimators=170, max_depth=5, min_samples_leaf=50, random_state=2)
-clf2 = Ridge(alpha=20)
-#scores=[]
-#sets = np.arange(1,9)
-#for set in sets:
+def reg_clf(X, y, clf, params):
+    estimator = GridSearchCV(clf, params, cv=3)
+    estimator.fit(X, y)
+    return estimator.best_score_ #estimator.cv_results_['mean_test_score']
+
+
+####################RANDOM FOREST
+rf = RandomForestRegressor()
 
 n_estimators = np.arange(170, 180, 5)
-max_depth=np.arange(5, 20, 5)
-min_samples_leaf = np.arange(50,70,10)
-
-param_grid = dict(n_estimators=n_estimators, max_depth=max_depth, min_samples_leaf=min_samples_leaf)
-
-alpha = np.arange(15,25,2)
-
-X_train = full_features_df[full_features_df['essay_set']==1]
-X_train = X_train.drop(['essay_set', 'count_pos', 'word_features'], axis=1)
-X_train = X_train.as_matrix()  ##X_train is an np array
-y_train = labels[labels['essay_set']==1]['domain1_score'].tolist() ##y_train is a list
-estimator = GridSearchCV(clf2, dict(alpha=alpha))
-estimator.fit(X_train, y_train)
-
-estimator.best_estimator_
-estimator.best_score_
 
 
+###################RIDGE
+ridge = Ridge()
+alphas_r = np.arange(0.001,3,0.1)
+
+
+###################LASSO
+lasso = Lasso()
+alphas_l = np.arange(0.1,3,0.1)
+
+###################GRADIENT BOOSTING
+params = {'n_estimators':[50, 100, 500, 1000], 'learning_rate':[1, 0.1, 0.3, 0.01], 'loss': ['ls']}
+
+gbr = ensemble.GradientBoostingRegressor()
+
+###################LINEAR REGRESSION
+linReg = LinearRegression()
+
+####################classifier dictionary
+classifiers= {'rf': {'clf': RandomForestRegressor(), 'params': {'n_estimators': np.arange(170, 180, 5)}}, 'ridge': {'clf': Ridge(), 'params': {'alpha': np.arange(0.001,3,0.1)}},
+              'lasso': {'clf': Lasso(),'params':{'alpha': np.arange(0.1,3,0.1)}},
+              'gbr':{'clf': ensemble.GradientBoostingRegressor(), 'params': {'n_estimators':[50, 100, 500, 1000], 'learning_rate':[1, 0.1, 0.3, 0.01], 'loss': ['ls']}}}
+
+###############################################################################
+################                                        ########################
+################    MODEL FITTING AND CROSSVALIDATION   ########################
+################                                        #######################
+###############################################################################
+
+sets=[1,2,3,5,6,7,8]
+clfs = ['rf', 'ridge', 'lasso', 'gbr']
+best_scores={set:{clf:[] for clf in clfs} for set in sets}
+
+for set in sets:
+    BOW_freq_df = pd.DataFrame.from_dict(full_word_dict[set])
+    index = BOW_freq_df.index.values
+    features_df_bySet = full_features_df[(full_features_df['essay_set'] == set)].set_index(index)
+    full_features_df_bySet = pd.concat([features_df_bySet, BOW_freq_df], axis=1)
+    X_train = full_features_df_bySet.drop(['essay_set', 'count_pos', 'word_features'], axis=1)
+    X_train = X_train.as_matrix()  ##X_train is an np array
+    y_train = labels[(labels['essay_set'] == set)]['domain1_score'].tolist()  ##y_train is a list
+    for clf in clfs:
+        best_score = reg_clf(X_train, y_train, classifiers[clf]['clf'], classifiers[clf]['params'])
+        best_scores[set][clf].append(best_score)
+
+import matplotlib.pyplot as plt
+
+bar_offsets = (np.arange(len(sets))*(len(clfs) + 1) + .5)
+plt.figure()
+COLORS = 'bgrcmyk'
+
+for i, clf in enumerate(clfs):
+    clf_best_scores=[]
+    for set in sets:
+        clf_best_scores.extend(best_scores[set][clf])
+        clf_best_scores_array = np.asarray(clf_best_scores)
+    plt.bar(bar_offsets + i/2, clf_best_scores_array, label=clf, color=COLORS[i])
+
+plt.title("Comparing Different Regression Predictions")
+plt.xlabel('Essay Sets')
+plt.xticks(bar_offsets + 3/2, sets)
+plt.ylabel('R square')
+plt.ylim((0, 1))
+plt.legend(loc='upper right')
+
+plt.show()
 
 ############################################
 ######Bokeh for word count:#################
