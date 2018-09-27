@@ -408,31 +408,9 @@ from sklearn import ensemble
 def reg_clf(X, y, clf, params):
     estimator = GridSearchCV(clf, params, cv=3)
     estimator.fit(X, y)
-    return estimator.best_score_ #estimator.cv_results_['mean_test_score']
+    return estimator.best_score_, estimator.best_estimator_.feature_importance() #estimator.cv_results_['mean_test_score']
 
 
-####################RANDOM FOREST
-rf = RandomForestRegressor()
-
-n_estimators = np.arange(170, 180, 5)
-
-
-###################RIDGE
-ridge = Ridge()
-alphas_r = np.arange(0.001,3,0.1)
-
-
-###################LASSO
-lasso = Lasso()
-alphas_l = np.arange(0.1,3,0.1)
-
-###################GRADIENT BOOSTING
-params = {'n_estimators':[50, 100, 500, 1000], 'learning_rate':[1, 0.1, 0.3, 0.01], 'loss': ['ls']}
-
-gbr = ensemble.GradientBoostingRegressor()
-
-###################LINEAR REGRESSION
-linReg = LinearRegression()
 
 ####################classifier dictionary
 classifiers= {'rf': {'clf': RandomForestRegressor(), 'params': {'n_estimators': np.arange(170, 180, 5)}}, 'ridge': {'clf': Ridge(), 'params': {'alpha': np.arange(0.001,3,0.1)}},
@@ -463,6 +441,9 @@ for set in sets:
 
 import matplotlib.pyplot as plt
 
+
+###############regression model comparisons bar plot###############################
+
 bar_offsets = (np.arange(len(sets))*(len(clfs) + 1) + .5)
 plt.figure()
 COLORS = 'bgrcmyk'
@@ -482,6 +463,148 @@ plt.ylim((0, 1))
 plt.legend(loc='upper right')
 
 plt.show()
+
+
+############feature importance plot: gbr in essay set 1 with best estimator#############
+'''
+essay1 and essay 5 have better predictions, lets take a look at the feature importance
+'''
+sets=np.array([1,5])
+
+for set in sets:
+    set = 1
+    BOW_freq_df = pd.DataFrame.from_dict(full_word_dict[set])
+    index = BOW_freq_df.index.values
+    features_df_bySet = full_features_df[(full_features_df['essay_set'] == set)].set_index(index)
+    full_features_df_bySet = pd.concat([features_df_bySet, BOW_freq_df], axis=1)
+    X_train = full_features_df_bySet.drop(['essay_set', 'count_pos', 'word_features'], axis=1)
+    X_train = X_train.as_matrix()  ##X_train is an np array
+    y_train = labels[(labels['essay_set'] == set)]['domain1_score'].tolist()  ##y_train is a list
+    gbr = ensemble.GradientBoostingRegressor()
+    grid = GridSearchCV(gbr, {'n_estimators': [50, 100, 500, 1000], 'learning_rate': [1, 0.1, 0.3, 0.01],
+                              'loss': ['ls']})
+    grid.fit(X_train, y_train)
+    importance = grid.best_estimator_.feature_importances_
+    rel_importance = 100.0 * (importance / importance.max())
+    feature_names = np.asarray(full_features_df_bySet.iloc[:, 1:].columns.values)
+    sorted_idx = np.argsort(rel_importance)
+    sorted_idx = sorted_idx[91:]
+    pos = np.arange(sorted_idx.shape[0]) + .5
+    plt.subplot(1, 2, 2)
+    plt.barh(pos, rel_importance[sorted_idx], align='center')
+    plt.yticks(pos, feature_names[sorted_idx])
+    plt.xlabel('Relative Importance')
+    plt.title('Variable Importance')
+    plt.show()
+
+
+    ############################################
+    ######Bokeh for word count:#################
+    ############################################
+
+    from bkcharts import BoxPlot, output_file, show
+    from bokeh.layouts import row
+    from numpy import linspace
+    from scipy.stats.kde import gaussian_kde
+    from bokeh.io import output_file, show
+    from bokeh.models import ColumnDataSource, FixedTicker, PrintfTickFormatter, Select
+    from bokeh.plotting import figure
+    from bokeh.sampledata.perceptions import probly
+    from bokeh.io import curdoc
+    import colorcet as cc
+    from bokeh.layouts import widgetbox, row
+
+    word_count_dict = Dict['total word_count']
+    sentence_number_dict = Dict['sentence_number']
+    word_features_dict = Dict['word_features']
+    count_lemma_dict = Dict['count_lemma']
+    spelling_error_dict = Dict['spelling_error']
+    count_pos_dict = Dict['count_pos']
+
+
+    ###############################################
+
+    def main():
+        print("Reading Training Data")
+        training = read_training_data("../Data/training_set_rel3.tsv")
+        print("Reading Validation Data")
+        test = read_test_data("../Data/valid_set.tsv")
+
+        feature_functions = [total_word_count, sent_num, word_feature, count_lemmas, BOW, count_spell_error, count_pos]
+
+        essay_sets = sorted(training.keys())
+        predictions = {}
+
+        for es_set in essay_sets:
+            print("Making Predictions for Essay Set %s" % es_set)
+            features = extract_features(training[es_set]["essay"],
+                                        feature_functions)
+            rf = RandomForestRegressor(n_estimators=100)
+            rf.fit(features, training[es_set]["score"])
+            features = extract_features(test[es_set]["essay"], feature_functions)
+            predicted_scores = rf.predict(features)
+            for pred_id, pred_score in zip(test[es_set]["prediction_id"],
+                                           predicted_scores):
+                predictions[pred_id] = round(pred_score)
+
+        output_file = "../Submissions/length_benchmark.csv"
+        print("Writing submission to %s" % output_file)
+        f = open(output_file, "w")
+        f.write("prediction_id,predicted_score\n")
+        for key in sorted(predictions.keys()):
+            f.write("%d,%d\n" % (key, predictions[key]))
+
+
+    import nltk
+    from bs4 import BeautifulSoup
+    import requests
+
+    page = requests.get("http://www.newyorksocialdiary.com/party-pictures/2015/celebrating-the-neighborhood")
+    soup = BeautifulSoup(page.text, "lxml")
+    captions = soup.find_all('div', attrs={'class': 'photocaption'})
+    captions.append(soup.find_all('td', attrs={'class': 'photocaption'}))
+
+
+    def get_captions(path):
+        page = requests.get(path)
+        soup = BeautifulSoup(page.text, 'lxml')
+        names = [c.get_text() for c in soup.find_all('div', attrs={'class': 'photocaption'})]
+        # captions = soup.find_all('div', attrs={'class':'photocaption'})
+        # captions.append(soup.find_all('td', attrs={'class':'photocaption'}))
+        # for i in np.arange(0,len(captions)):
+        # names.append(captions[i].text)
+        # names.append(c.get_text() for c in soup.find_all('td', attrs={'class':'photocaption'}))
+        return names
+
+
+    import spacy
+
+    captions = get_captions("http://www.newyorksocialdiary.com/party-pictures/2015/celebrating-the-neighborhood")
+    caption = captions[0]
+
+    nlp = spacy.load('en_core_web_sm', disable=['textcat', 'parser', 'tagger'])
+    doc = nlp(caption)
+
+    names = []
+    for token in doc.ents:
+        if token.label_ == 'PERSON' and len(token) > 1:
+            name = token.text.strip()
+            names.append(name)
+
+
+    def extract_entity_names_NE(t):
+        entity_names = []
+        if hasattr(t, 'label') and t.label:
+            if t.label() == 'NE':
+                entity_names.append(' '.join([child[0] for child in t]))
+            else:
+                for child in t:
+                    entity_names.extend(extract_entity_names_NE(child))
+        return entity_names
+
+
+    import networkx as nx
+    from collections import Counter
 
 ############################################
 ######Bokeh for word count:#################
