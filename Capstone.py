@@ -388,10 +388,19 @@ for set in sets:
     word_dict = BOWvectorizer_toDict(essays)
     full_word_dict[set]=word_dict
 
+#dill.dump(full_word_dict, open('full_word_dict.pkd', 'wb'))
+full_word_dict = dill.load(open('full_word_dict.pkd', 'rb'))
+
 ##########Full features df
 full_features_df = pd.concat([df['essay_set'], feature_df, count_tag_df, word_features_df], axis=1)
 
+
 labels =pd.concat([df['essay_set'], df['domain1_score']], axis=1)
+
+#dill.dump(full_features_df, open('full_features_df.pkd', 'wb'))
+#dill.dump(labels, open('labels.pkd', 'wb'))
+full_features_df = dill.load(open('full_features_df.pkd', 'rb'))
+labels = dill.load(open('labels.pkd', 'rb'))
 
 ############################################################################
 ##########   ML REGRESSION INITIALIZATION   ################################
@@ -408,7 +417,7 @@ from sklearn import ensemble
 def reg_clf(X, y, clf, params):
     estimator = GridSearchCV(clf, params, cv=3)
     estimator.fit(X, y)
-    return estimator.best_score_, estimator.best_estimator_.feature_importance() #estimator.cv_results_['mean_test_score']
+    return estimator.best_score_#, estimator.best_estimator_.feature_importance() #estimator.cv_results_['mean_test_score']
 
 
 
@@ -439,10 +448,11 @@ for set in sets:
         best_score = reg_clf(X_train, y_train, classifiers[clf]['clf'], classifiers[clf]['params'])
         best_scores[set][clf].append(best_score)
 
-import matplotlib.pyplot as plt
+
 
 
 ###############regression model comparisons bar plot###############################
+import matplotlib.pyplot as plt
 
 bar_offsets = (np.arange(len(sets))*(len(clfs) + 1) + .5)
 plt.figure()
@@ -496,6 +506,72 @@ for set in sets:
     plt.xlabel('Relative Importance')
     plt.title('Variable Importance')
     plt.show()
+
+############################################################################################################
+###########CHECKING THE OVERFITTING OF GRADIENT BOOSTING REGRESSION##############################
+##################################################################################################
+from sklearn.model_selection import ShuffleSplit, train_test_split, learning_curve
+
+def GradientBooster(param_grid):
+    estimator = ensemble.GradientBoostingRegressor()
+    #cv = ShuffleSplit(X_train.shape[0], test_size=0.3)
+    classifier = GridSearchCV(estimator=estimator, cv=3, param_grid=param_grid)
+    classifier.fit(X_train, y_train)
+    print ("Best Estimator learned through GridSearch")
+    print(classifier.best_estimator_, classifier.best_score_)
+    return classifier.best_estimator_, classifier.best_score_
+
+param_grid = {'n_estimators':[50, 100, 500, 750, 1000], 'learning_rate':[1, 0.1, 0.3, 0.01, 0.005], 'max_depth':[6, 4]}
+
+
+
+for set in sets:
+    set = 8
+    BOW_freq_df = pd.DataFrame.from_dict(full_word_dict[set])
+    index = BOW_freq_df.index.values
+    features_df_bySet = full_features_df[(full_features_df['essay_set'] == set)].set_index(index)
+    full_features_df_bySet = pd.concat([features_df_bySet, BOW_freq_df], axis=1)
+    X_train = full_features_df_bySet.drop(['essay_set', 'count_pos', 'word_features'], axis=1).as_matrix() ##X is an np array
+    y_train = labels[(labels['essay_set'] == set)]['domain1_score'].tolist()  ##y is a list
+    #X_train, X_test, y_train, y_test = train_test_split(X, y)
+    best_est, best_score = GradientBooster(param_grid)
+
+title = "Learning Curves (Gradient Boosted Regression Trees)"
+estimator1 = ensemble.GradientBoostingRegressor(n_estimators=750, max_depth=4,  learning_rate=0.005)
+estimator2 = ensemble.GradientBoostingRegressor(n_estimators=750, max_depth=4,  learning_rate=0.005)
+estimator3 = ensemble.GradientBoostingRegressor(n_estimators=500, max_depth=4,  learning_rate=0.002)
+
+def plot_learning_curve(estimator, title, X, y, ylim=None, cv=None, n_jobs=1, train_sizes=np.linspace(.1, 1.0, 5)):
+    plt.figure()
+    plt.title(title)
+    if ylim is not None: plt.ylim(*ylim)
+    plt.xlabel("Training examples")
+    plt.ylabel("Score")
+    train_sizes, train_scores, test_scores = learning_curve(estimator, X, y, cv=cv, n_jobs=n_jobs,
+                                                            train_sizes=train_sizes)
+    train_scores_mean = np.mean(train_scores, axis=1)
+    train_scores_std = np.std(train_scores, axis=1)
+    test_scores_mean = np.mean(test_scores, axis=1)
+    test_scores_std = np.std(test_scores, axis=1)
+    plt.grid()
+    plt.fill_between(train_sizes, train_scores_mean - train_scores_std, train_scores_mean + train_scores_std, alpha=0.1,
+                     color="r")
+    plt.fill_between(train_sizes, test_scores_mean - test_scores_std, test_scores_mean + test_scores_std, alpha=0.1,
+                     color="g")
+    plt.plot(train_sizes, train_scores_mean, 'o-', color="r", label="Training score")
+    plt.plot(train_sizes, test_scores_mean, 'o-', color="g", label="Cross-validation score")
+    plt.legend(loc="best")
+    return plt
+
+plot_learning_curve(estimator2, title, X_train, y_train, cv=5, n_jobs=1)
+plt.title('Learning Curves (Essay_set 8): n_estimators=750, max_depth=4,  learning_rate=0.005')
+plt.show()
+
+
+
+
+
+
 
 
     ############################################
