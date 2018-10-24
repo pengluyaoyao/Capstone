@@ -402,29 +402,51 @@ labels =pd.concat([df['essay_set'], df['domain1_score']], axis=1)
 full_features_df = dill.load(open('full_features_df.pkd', 'rb'))
 labels = dill.load(open('labels.pkd', 'rb'))
 
+
+#####Train and Test Split###########
+
+
 ############################################################################
 ##########   ML REGRESSION INITIALIZATION   ################################
 ############################################################################
 '''
 n_components can be tuned
 '''
-from sklearn.linear_model import Ridge, LinearRegression, Lasso
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.model_selection import cross_val_score, GridSearchCV
+from sklearn.model_selection import cross_val_score, GridSearchCV, RandomizedSearchCV
 from sklearn.metrics import cohen_kappa_score
 from sklearn import ensemble
+import xgboost as xgb
 
-def reg_clf(X, y, clf, params):
+def reg_grid_cv(X, y, clf, params):
     estimator = GridSearchCV(clf, params, cv=3)
     estimator.fit(X, y)
-    return estimator.best_score_#, estimator.best_estimator_.feature_importance() #estimator.cv_results_['mean_test_score']
+    return estimator.best_score_, estimator.best_estimator_#.feature_importance() #estimator.cv_results_['mean_test_score']
 
-
+def reg_rnd_cv(X, y, clf, n_iter_search, param_dist, n_jobs):
+    random_search = RandomizedSearchCV(clf, param_distributions=param_dist,
+                                       n_iter=n_iter_search, cv=3, n_jobs=n_jobs)
+    random_search.fit(X, y)
+    return random_search.best_score_, random_search.best_estimator_
 
 ####################classifier dictionary
-classifiers= {'rf': {'clf': RandomForestRegressor(), 'params': {'n_estimators': np.arange(170, 180, 5)}}, 'ridge': {'clf': Ridge(), 'params': {'alpha': np.arange(0.001,3,0.1)}},
-              'lasso': {'clf': Lasso(),'params':{'alpha': np.arange(0.1,3,0.1)}},
-              'gbr':{'clf': ensemble.GradientBoostingRegressor(), 'params': {'n_estimators':[50, 100, 500, 1000], 'learning_rate':[1, 0.1, 0.3, 0.01], 'loss': ['ls']}}}
+classifiers= {#'rf': {'clf': RandomForestRegressor(), 'params': {'n_estimators': np.arange(170, 180, 5)}},
+              'gbr':{'clf': ensemble.GradientBoostingRegressor(),
+                     '1': {'n_estimators':np.arange(80,400,30), 'max_depth': np.arange(1,20,2),
+                         'min_samples_split': [0.3,0.4,0.5,0.6,0.7,0.8],'learning_rate':np.arange(0.05,0.2,0.02)},
+                     '2': {'n_estimators':np.arange(80,400,30), 'max_depth': np.arange(1,20,2),
+                         'min_samples_split': [0.3,0.4,0.5,0.6,0.7,0.8],'learning_rate':np.arange(0.05,0.2,0.02)},
+                     '3': {'n_estimators':np.arange(80,400,30), 'max_depth': np.arange(1,20,2),
+                         'min_samples_split': [0.3,0.4,0.5,0.6,0.7,0.8],'learning_rate':np.arange(0.05,0.2,0.02)},
+                     '5': {'n_estimators':np.arange(80,400,30), 'max_depth': np.arange(20,50,5),
+                         'min_samples_split': [0.3,0.4,0.5,0.6,0.7,0.8],'learning_rate':np.arange(0.05,0.2,0.02)},
+                     '6': {'n_estimators':np.arange(80,400,30), 'max_depth': np.arange(1,20,2),
+                         'min_samples_split': np.arange(0.05, 0.4,0.05),'learning_rate':np.arange(0.05,0.2,0.02)},
+                     '7': {'n_estimators':np.arange(400,900,100), 'max_depth': np.arange(1,20,2),
+                         'min_samples_split': np.arange(0.05, 0.4,0.05),'learning_rate':np.arange(0.001,0.011,0.002)},
+                     '8': {'n_estimators':np.arange(400,900,100), 'max_depth': np.arange(12,20,2),
+                         'min_samples_split': np.arange(0.6,1,0.1),'learning_rate':np.arange(0.05,0.2,0.02)}
+                     }
+              }
 
 ###############################################################################
 ################                                        ########################
@@ -433,7 +455,7 @@ classifiers= {'rf': {'clf': RandomForestRegressor(), 'params': {'n_estimators': 
 ###############################################################################
 
 sets=[1,2,3,5,6,7,8]
-clfs = ['rf', 'ridge', 'lasso', 'gbr']
+clfs = ['gbr']
 best_scores={set:{clf:[] for clf in clfs} for set in sets}
 
 for set in sets:
@@ -445,7 +467,9 @@ for set in sets:
     X_train = X_train.as_matrix()  ##X_train is an np array
     y_train = labels[(labels['essay_set'] == set)]['domain1_score'].tolist()  ##y_train is a list
     for clf in clfs:
-        best_score = reg_clf(X_train, y_train, classifiers[clf]['clf'], classifiers[clf]['params'])
+        #best_score = reg_grid_cv(X_train, y_train, classifiers[clf]['clf'], classifiers[clf]['params'])
+        best_score = reg_rnd_cv(X=X_train, y=y_train, clf=classifiers['gbr']['clf'], n_iter_search=20, param_dist= classifiers['gbr'][str(set)], n_jobs=3)
+        print(best_score)
         best_scores[set][clf].append(best_score)
 
 
@@ -569,232 +593,11 @@ plt.show()
 
 
 
+import scholarly
+search_query = scholarly.search_pubs_query('Chaos theory and strategy: Theory, application, and managerial implications')
+author = next(search_query).fill()
+results = [print(citation.bib['title']) for citation in author.get_citedby()]
 
-
-
-
-
-    ############################################
-    ######Bokeh for word count:#################
-    ############################################
-
-    from bkcharts import BoxPlot, output_file, show
-    from bokeh.layouts import row
-    from numpy import linspace
-    from scipy.stats.kde import gaussian_kde
-    from bokeh.io import output_file, show
-    from bokeh.models import ColumnDataSource, FixedTicker, PrintfTickFormatter, Select
-    from bokeh.plotting import figure
-    from bokeh.sampledata.perceptions import probly
-    from bokeh.io import curdoc
-    import colorcet as cc
-    from bokeh.layouts import widgetbox, row
-
-    word_count_dict = Dict['total word_count']
-    sentence_number_dict = Dict['sentence_number']
-    word_features_dict = Dict['word_features']
-    count_lemma_dict = Dict['count_lemma']
-    spelling_error_dict = Dict['spelling_error']
-    count_pos_dict = Dict['count_pos']
-
-
-    ###############################################
-
-    def main():
-        print("Reading Training Data")
-        training = read_training_data("../Data/training_set_rel3.tsv")
-        print("Reading Validation Data")
-        test = read_test_data("../Data/valid_set.tsv")
-
-        feature_functions = [total_word_count, sent_num, word_feature, count_lemmas, BOW, count_spell_error, count_pos]
-
-        essay_sets = sorted(training.keys())
-        predictions = {}
-
-        for es_set in essay_sets:
-            print("Making Predictions for Essay Set %s" % es_set)
-            features = extract_features(training[es_set]["essay"],
-                                        feature_functions)
-            rf = RandomForestRegressor(n_estimators=100)
-            rf.fit(features, training[es_set]["score"])
-            features = extract_features(test[es_set]["essay"], feature_functions)
-            predicted_scores = rf.predict(features)
-            for pred_id, pred_score in zip(test[es_set]["prediction_id"],
-                                           predicted_scores):
-                predictions[pred_id] = round(pred_score)
-
-        output_file = "../Submissions/length_benchmark.csv"
-        print("Writing submission to %s" % output_file)
-        f = open(output_file, "w")
-        f.write("prediction_id,predicted_score\n")
-        for key in sorted(predictions.keys()):
-            f.write("%d,%d\n" % (key, predictions[key]))
-
-
-    import nltk
-    from bs4 import BeautifulSoup
-    import requests
-
-    page = requests.get("http://www.newyorksocialdiary.com/party-pictures/2015/celebrating-the-neighborhood")
-    soup = BeautifulSoup(page.text, "lxml")
-    captions = soup.find_all('div', attrs={'class': 'photocaption'})
-    captions.append(soup.find_all('td', attrs={'class': 'photocaption'}))
-
-
-    def get_captions(path):
-        page = requests.get(path)
-        soup = BeautifulSoup(page.text, 'lxml')
-        names = [c.get_text() for c in soup.find_all('div', attrs={'class': 'photocaption'})]
-        # captions = soup.find_all('div', attrs={'class':'photocaption'})
-        # captions.append(soup.find_all('td', attrs={'class':'photocaption'}))
-        # for i in np.arange(0,len(captions)):
-        # names.append(captions[i].text)
-        # names.append(c.get_text() for c in soup.find_all('td', attrs={'class':'photocaption'}))
-        return names
-
-
-    import spacy
-
-    captions = get_captions("http://www.newyorksocialdiary.com/party-pictures/2015/celebrating-the-neighborhood")
-    caption = captions[0]
-
-    nlp = spacy.load('en_core_web_sm', disable=['textcat', 'parser', 'tagger'])
-    doc = nlp(caption)
-
-    names = []
-    for token in doc.ents:
-        if token.label_ == 'PERSON' and len(token) > 1:
-            name = token.text.strip()
-            names.append(name)
-
-
-    def extract_entity_names_NE(t):
-        entity_names = []
-        if hasattr(t, 'label') and t.label:
-            if t.label() == 'NE':
-                entity_names.append(' '.join([child[0] for child in t]))
-            else:
-                for child in t:
-                    entity_names.extend(extract_entity_names_NE(child))
-        return entity_names
-
-
-    import networkx as nx
-    from collections import Counter
-
-############################################
-######Bokeh for word count:#################
-############################################
-
-from bkcharts import BoxPlot, output_file, show
-from bokeh.layouts import row
-from numpy import linspace
-from scipy.stats.kde import gaussian_kde
-from bokeh.io import output_file, show
-from bokeh.models import ColumnDataSource, FixedTicker, PrintfTickFormatter, Select
-from bokeh.plotting import figure
-from bokeh.sampledata.perceptions import probly
-from bokeh.io import curdoc
-import colorcet as cc
-from bokeh.layouts import widgetbox, row
-
-
-
-word_count_dict = Dict['total word_count']
-sentence_number_dict = Dict['sentence_number']
-word_features_dict = Dict['word_features']
-count_lemma_dict = Dict['count_lemma']
-spelling_error_dict = Dict['spelling_error']
-count_pos_dict = Dict['count_pos']
-
-
-###############################################
-
-
-
-
-def main():
-    print("Reading Training Data")
-    training = read_training_data("../Data/training_set_rel3.tsv")
-    print("Reading Validation Data")
-    test = read_test_data("../Data/valid_set.tsv")
-
-    feature_functions = [total_word_count, sent_num, word_feature, count_lemmas, BOW, count_spell_error, count_pos]
-
-    essay_sets = sorted(training.keys())
-    predictions = {}
-
-    for es_set in essay_sets:
-        print("Making Predictions for Essay Set %s" % es_set)
-        features = extract_features(training[es_set]["essay"],
-                                    feature_functions)
-        rf = RandomForestRegressor(n_estimators=100)
-        rf.fit(features, training[es_set]["score"])
-        features = extract_features(test[es_set]["essay"], feature_functions)
-        predicted_scores = rf.predict(features)
-        for pred_id, pred_score in zip(test[es_set]["prediction_id"],
-                                       predicted_scores):
-            predictions[pred_id] = round(pred_score)
-
-    output_file = "../Submissions/length_benchmark.csv"
-    print("Writing submission to %s" % output_file)
-    f = open(output_file, "w")
-    f.write("prediction_id,predicted_score\n")
-    for key in sorted(predictions.keys()):
-        f.write("%d,%d\n" % (key, predictions[key]))
-
-
-
-
-import nltk
-from bs4 import BeautifulSoup
-import requests
-page = requests.get("http://www.newyorksocialdiary.com/party-pictures/2015/celebrating-the-neighborhood")
-soup = BeautifulSoup(page.text, "lxml")
-captions = soup.find_all('div', attrs={'class':'photocaption'})
-captions.append(soup.find_all('td', attrs={'class':'photocaption'}))
-
-def get_captions(path):
-    page = requests.get(path)
-    soup = BeautifulSoup(page.text,'lxml')
-    names = [c.get_text() for c in soup.find_all('div', attrs={'class':'photocaption'})]
-    #captions = soup.find_all('div', attrs={'class':'photocaption'})
-    #captions.append(soup.find_all('td', attrs={'class':'photocaption'}))
-    #for i in np.arange(0,len(captions)):
-        #names.append(captions[i].text)
-    #names.append(c.get_text() for c in soup.find_all('td', attrs={'class':'photocaption'}))
-    return names
-
-import spacy
-captions = get_captions("http://www.newyorksocialdiary.com/party-pictures/2015/celebrating-the-neighborhood")
-caption=captions[0]
-
-
-nlp = spacy.load('en_core_web_sm', disable=['textcat','parser', 'tagger'])
-doc = nlp(caption)
-
-names = []
-for token in doc.ents:
-    if token.label_ =='PERSON' and len(token)>1:
-        name = token.text.strip()
-        names.append(name)
-
-
-
-def extract_entity_names_NE(t):
-    entity_names = []
-    if hasattr(t, 'label') and t.label:
-        if t.label() == 'NE':
-            entity_names.append(' '.join([child[0] for child in t]))
-        else:
-            for child in t:
-                entity_names.extend(extract_entity_names_NE(child))
-    return entity_names
-
-
-import networkx as nx
-from collections import Counter
-
-
+results = [citation.bib['title'] for citation in author.get_citedby()]
 
 
