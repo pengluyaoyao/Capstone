@@ -16,7 +16,7 @@ from collections import defaultdict
 #df = pd.read_excel("/Users/pengluyao/.kaggle/training_set_rel3.xls")
 
 df = pd.read_excel("training_set_rel3.xls")
-
+df_test = pd.read_excel("valid_set.xls")
 #names = list(df.columns.values)
 #data = df[['essay_set','essay','domain1_score']].copy()
 ##print(data)
@@ -36,6 +36,16 @@ for index, row in df.iterrows():
     train_data[essay_set]["essays"].append(essay)
     train_data[essay_set]['score'].append(domain1_score)
 
+test_data = {}
+for index, row in df_test.iterrows():
+    essay = row["essay"].strip()#.split(" ")
+    essay_set = row['essay_set']
+    if essay_set not in test_data:
+        test_data[essay_set] = {"essays":[]}
+
+    test_data[essay_set]["essays"].append(essay)
+
+
 #essay1 = train_data[1]['essay'][0]
 
 ################################################
@@ -54,7 +64,6 @@ for index, row in df.iterrows():
 def sentence_to_wordlist(raw_sentence):
     clean_sentence = re.sub("[^a-zA-Z0-9]", " ", raw_sentence)
     tokens = nltk.word_tokenize(clean_sentence)
-
     return tokens
 
 
@@ -130,7 +139,7 @@ def word_feature(essay): #average word count and std of word count in sentence, 
 def count_lemmas(essay):
     tokenized_sentences = tokenize(essay)
 
-    lemmas = []
+    lemmas = set()
     wordnet_lemmatizer = WordNetLemmatizer()
 
     for sentence in tokenized_sentences:
@@ -142,36 +151,35 @@ def count_lemmas(essay):
 
             if pos_tag.startswith('N'):
                 pos = wordnet.NOUN
-                lemmas.append(wordnet_lemmatizer.lemmatize(token_tuple[0], pos))
+                lemmas.add(wordnet_lemmatizer.lemmatize(token_tuple[0], pos))
             elif pos_tag.startswith('J'):
                 pos = wordnet.ADJ
-                lemmas.append(wordnet_lemmatizer.lemmatize(token_tuple[0], pos))
+                lemmas.add(wordnet_lemmatizer.lemmatize(token_tuple[0], pos))
             elif pos_tag.startswith('V'):
                 pos = wordnet.VERB
-                lemmas.append(wordnet_lemmatizer.lemmatize(token_tuple[0], pos))
+                lemmas.add(wordnet_lemmatizer.lemmatize(token_tuple[0], pos))
             elif pos_tag.startswith('R'):
                 pos = wordnet.ADV
-                lemmas.append(wordnet_lemmatizer.lemmatize(token_tuple[0], pos))
+                lemmas.add(wordnet_lemmatizer.lemmatize(token_tuple[0], pos))
             else:
                 pos = wordnet.NOUN
-                lemmas.append(wordnet_lemmatizer.lemmatize(token_tuple[0], pos))
+                lemmas.add(wordnet_lemmatizer.lemmatize(token_tuple[0], pos))
 
-    lemma_count = len(set(lemmas))
+    lemma_count = len(lemmas)
 
     return lemma_count
-
 
 ##BOW
 from sklearn.feature_extraction.text import HashingVectorizer
 
-
+'''
 def BOW1(essays):
     TOKENS_ALPHANUMERIC = '[A-Za-z0-9]+(?=\\s+)'
     hashing_vec = HashingVectorizer(token_pattern=TOKENS_ALPHANUMERIC, non_negative=True, norm=None, binary=False, ngram_range=(1, 2),stop_words='english')
     hashed_text = hashing_vec.fit_transform(essays)
     hashed_df = pd.DataFrame(hashed_text.data)
     print(hashed_df.head())
-
+'''
 
 def BOW2(essay): ##essay is in the format of df[df['essay_set'] == 1]['essay']
     #sentence = nltk.sent_tokenize(essay)  ##
@@ -180,6 +188,7 @@ def BOW2(essay): ##essay is in the format of df[df['essay_set'] == 1]['essay']
     feature_names = vectorizer.get_feature_names()
     return feature_names, feature_matrix
 
+'''
 from sklearn.decomposition import NMF
 
 def print_top_words(model, feature_names, n_top_words):
@@ -208,7 +217,7 @@ for k in train_data:
               alpha=.1, l1_ratio=.5).fit(tfidf)
 
     loadings.append(np.matmul(tfidfarray, np.transpose(nmf.components_))) #loadings is list of lists
-
+'''
 
 
 #tfidf_feature_names = tfidf_vectorizer.get_feature_names()
@@ -276,32 +285,35 @@ def extract_features(essays, feature_functions):
 
 feature_functions = [total_word_count, sent_num, word_feature, count_lemmas, count_spell_error, count_pos]
 
-essay_sets = sorted(train_data.keys())
+def creating_features(data):
+    keys = [1,2,3,4,5,6,7,8]
+    features = {key: [] for key in keys}
+    big_dict = get_big_dict()
+    for es_set in keys:
+        #if es_set not in BOW_dict:
+         #   BOW_dict={'es_set':[]}
+        #BOW_dict['es_set'].append([get_clean_essay(essay) for essay in train_data[es_set]['essays']])
 
-#BOW_dict={}
-keys = [1,2,3,4,5,6,7,8]
-features = {key: [] for key in keys}
-big_dict = get_big_dict()
-for es_set in keys:
-    #if es_set not in BOW_dict:
-     #   BOW_dict={'es_set':[]}
-    #BOW_dict['es_set'].append([get_clean_essay(essay) for essay in train_data[es_set]['essays']])
+        print("Extracting Features for Essay Set %s" % es_set)
+        #if es_set not in features:
+            #features={es_set :[]}
+        features[es_set].extend(extract_features(data[es_set]["essays"], feature_functions))
 
-    print("Extracting Features for Essay Set %s" % es_set)
-    #if es_set not in features:
-        #features={es_set :[]}
-    features[es_set].extend(extract_features(train_data[es_set]["essays"], feature_functions))
+    new_keys = ["total word_count","sentence_number","word_features","count_lemma","spelling_error","count_pos"]
+    Dict = {key: defaultdict(list) for key in new_keys}
+    for key, value in features.items():
+        for v in value:
+            Dict['total word_count']['essay_set %s' % key].append(v[0])
+            Dict['sentence_number']['essay_set %s' % key].append(v[1])
+            Dict['word_features']['essay_set %s' % key].append(v[2])
+            Dict['count_lemma']['essay_set %s' % key].append(v[3])
+            Dict['spelling_error']['essay_set %s' % key].append(v[4])
+            Dict['count_pos']['essay_set %s' % key].append(v[5])
+    return features, Dict
 
-new_keys = ["total word_count","sentence_number","word_features","count_lemma","spelling_error","count_pos"]
-Dict = {key: defaultdict(list) for key in new_keys}
-for key, value in features.items():
-    for v in value:
-        Dict['total word_count']['essay_set %s' % key].append(v[0])
-        Dict['sentence_number']['essay_set %s' % key].append(v[1])
-        Dict['word_features']['essay_set %s' % key].append(v[2])
-        Dict['count_lemma']['essay_set %s' % key].append(v[3])
-        Dict['spelling_error']['essay_set %s' % key].append(v[4])
-        Dict['count_pos']['essay_set %s' % key].append(v[5])
+feature_train, Dict_train = creating_features(train_data)
+feature_test, Dict_test = creating_features(test_data)
+
 
 #######################################################
 import dill
@@ -310,43 +322,66 @@ Dict = dill.load(open('featurs_dict.pkd', 'rb'))
 features = dill.load(open('features.pkd', 'rb'))
 Dict['total word_count'].pop('0',None)
 
+#dill.dump(feature_test, open('features_test.pkd', 'wb'))
+#dill.dump(Dict_test, open('featurs_dict_test.pkd', 'wb'))
+
+Dict_test = dill.load(open('featurs_dict_test.pkd', 'rb'))
+features_test = dill.load(open('features_test.pkd', 'rb'))
+
+
 #######################################################
 #######CREATING DATAFRAME OF FEATURES AND LABELS#######
 #######################################################
-dict_todf = {}
 
-for Key in Dict:
-    dict_todf[Key]=[]
-    for key in Dict[Key]:
-        if Dict[Key][key]!=[]:
-            dict_todf[Key].extend(Dict[Key][key])
+def creating_df_from_feature_dict(Dict):
+    dict_todf = {}
+    for Key in Dict:
+        dict_todf[Key]=[]
+        for key in Dict[Key]:
+            if Dict[Key][key]!=[]:
+                dict_todf[Key].extend(Dict[Key][key])
+    return dict_todf
 
-
+dict_todf = creating_df_from_feature_dict(Dict)
+dict_todf_test = creating_df_from_feature_dict(Dict_test)
 
 feature_df = pd.DataFrame.from_dict(dict_todf)
+feature_df_test = pd.DataFrame.from_dict(dict_todf_test)
 
 ###open tuple and list in feature_df
-
 ####count of noun etc df, open tuple
-count_tag = {'noun_count':[], 'adj_count':[], 'verb_count':[], 'adv_count':[]}
-for t in feature_df['count_pos'].iteritems():
-    count_tag['noun_count'].append(t[1][0])
-    count_tag['adj_count'].append(t[1][1])
-    count_tag['verb_count'].append(t[1][2])
-    count_tag['adv_count'].append(t[1][3])
 
+def open_tuple(feature_df):
+    count_tag = {'noun_count':[], 'adj_count':[], 'verb_count':[], 'adv_count':[]}
+    for t in feature_df['count_pos'].iteritems():
+        count_tag['noun_count'].append(t[1][0])
+        count_tag['adj_count'].append(t[1][1])
+        count_tag['verb_count'].append(t[1][2])
+        count_tag['adv_count'].append(t[1][3])
+    return count_tag
+
+count_tag_test = open_tuple(feature_df_test)
+count_tag = open_tuple(feature_df)
 count_tag_df = pd.DataFrame.from_dict(count_tag)
+count_tag_df_test = pd.DataFrame.from_dict(count_tag_test)
 
 ####word features df, open list
-word_features_ = {'avg_word_len':[], 'avg_wordcount':[], 'std_word_count':[]}
-for l in feature_df['word_features'].iteritems():
-    word_features_['avg_word_len'].append(l[1][0])
-    word_features_['avg_wordcount'].append(l[1][1])
-    word_features_['std_word_count'].append(l[1][2])
 
+def open_list(feature_df):
+    word_features_ = {'avg_word_len':[], 'avg_wordcount':[], 'std_word_count':[]}
+    for l in feature_df['word_features'].iteritems():
+        word_features_['avg_word_len'].append(l[1][0])
+        word_features_['avg_wordcount'].append(l[1][1])
+        word_features_['std_word_count'].append(l[1][2])
+    return word_features_
+
+word_features_ = open_list(feature_df)
 word_features_df = pd.DataFrame.from_dict(word_features_)
 
+word_features_test = open_list(feature_df_test)
+word_features_df_test= pd.DataFrame.from_dict(word_features_test)
 
+'''
 #####NMF loading df
 from collections import OrderedDict
 
@@ -363,12 +398,17 @@ for c in comp_dict:
     col +=1
 
 BOW_loading_df = pd.DataFrame.from_dict(comp_dict)
+'''
 
 ####Using original tfidfarray instead of loadings on 10 components by NMF
+####Cannot convert to df from dict because each essay set has different BOW df (feature names are different).
+####concat BOW df essay set by essay set
+
+from collections import OrderedDict
 
 def BOWvectorizer_toDict(essays):
     tfidf_vectorizer = TfidfVectorizer(max_df=0.95, min_df=2,
-                                   max_features=n_features,
+                                   max_features=500,
                                    stop_words='english')
     tfidf = tfidf_vectorizer.fit_transform(essays)
     tfidfarray = tfidf.toarray()  ##n_essays in each set *n_features array
@@ -381,19 +421,26 @@ def BOWvectorizer_toDict(essays):
     col+=1
     return word_dict
 
-full_word_dict = {}
-sets=np.arange(1,9)
-for set in sets:
-    essays = train_data[set]['essays']
-    word_dict = BOWvectorizer_toDict(essays)
-    full_word_dict[set]=word_dict
+def create_wc_dict(dict):
+    full_word_count_dict = {}
+    Sets=np.arange(1,9)
+    for Set in Sets:
+        essays = dict[Set]['essays']
+        word_count_dict = BOWvectorizer_toDict(essays)
+        full_word_count_dict[Set]=word_count_dict
+    return full_word_count_dict
+
+full_word_dict_test = create_wc_dict(test_data)
 
 #dill.dump(full_word_dict, open('full_word_dict.pkd', 'wb'))
 full_word_dict = dill.load(open('full_word_dict.pkd', 'rb'))
 
+#dill.dump(full_word_dict_test, open('full_word_dict_test.pkd', 'wb'))
+full_word_dict_test = dill.load(open('full_word_dict_test.pkd', 'rb'))
+
 ##########Full features df
 full_features_df = pd.concat([df['essay_set'], feature_df, count_tag_df, word_features_df], axis=1)
-
+full_features_df_test = pd.concat([df_test['essay_set'], feature_df_test, count_tag_df_test, word_features_df_test], axis=1)
 
 labels =pd.concat([df['essay_set'], df['domain1_score']], axis=1)
 
@@ -402,33 +449,45 @@ labels =pd.concat([df['essay_set'], df['domain1_score']], axis=1)
 full_features_df = dill.load(open('full_features_df.pkd', 'rb'))
 labels = dill.load(open('labels.pkd', 'rb'))
 
-
+#dill.dump(full_features_df_test, open('full_features_df_test.pkd', 'wb'))
+full_features_df_test= dill.load(open('full_features_df_test.pkd', 'rb'))
 #####Train and Test Split###########
 
 
+
+###############################################################################
+################                                        ########################
+################    MODEL FITTING AND CROSSVALIDATION   ########################
+################                                        #######################
+###############################################################################
+
+
 ############################################################################
-##########   ML REGRESSION INITIALIZATION   ################################
+##########   CROSS-VALIDATION INITIALIZATION   ################################
 ############################################################################
-'''
-n_components can be tuned
-'''
 from sklearn.model_selection import cross_val_score, GridSearchCV, RandomizedSearchCV
 from sklearn.metrics import cohen_kappa_score
 from sklearn import ensemble
 import xgboost as xgb
-
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import explained_variance_score
+'''
 def reg_grid_cv(X, y, clf, params):
     estimator = GridSearchCV(clf, params, cv=3)
     estimator.fit(X, y)
     return estimator.best_score_, estimator.best_estimator_#.feature_importance() #estimator.cv_results_['mean_test_score']
+
 
 def reg_rnd_cv(X, y, clf, n_iter_search, param_dist, n_jobs):
     random_search = RandomizedSearchCV(clf, param_distributions=param_dist,
                                        n_iter=n_iter_search, cv=3, n_jobs=n_jobs)
     random_search.fit(X, y)
     return random_search.best_score_, random_search.best_estimator_
+'''
 
-####################classifier dictionary
+##########################CROSS-VALIDATION FOR EACH ESSAY SET#################################
+####################DEFINING PARAMETERS TO BE TUNED: classifier dictionary INCLUDE 'GBR'####################
+
 classifiers= {#'rf': {'clf': RandomForestRegressor(), 'params': {'n_estimators': np.arange(170, 180, 5)}},
               'gbr':{'clf': ensemble.GradientBoostingRegressor(),
                      '1': {'n_estimators':np.arange(80,400,30), 'max_depth': np.arange(1,20,2),
@@ -448,20 +507,14 @@ classifiers= {#'rf': {'clf': RandomForestRegressor(), 'params': {'n_estimators':
                      }
               }
 
-###############################################################################
-################                                        ########################
-################    MODEL FITTING AND CROSSVALIDATION   ########################
-################                                        #######################
-###############################################################################
-
-sets=[1,2,3,5,6,7,8]
+Sets=[1,2,3,5,6,7,8]
 clfs = ['gbr']
-best_scores={set:{clf:[] for clf in clfs} for set in sets}
+best_scores={Set:{clf:[] for clf in clfs} for Set in Sets}
 
-for set in sets:
+for Set in Sets:
     BOW_freq_df = pd.DataFrame.from_dict(full_word_dict[set])
     index = BOW_freq_df.index.values
-    features_df_bySet = full_features_df[(full_features_df['essay_set'] == set)].set_index(index)
+    features_df_bySet = full_features_df[(full_features_df['essay_set'] == Set)].set_index(index)
     full_features_df_bySet = pd.concat([features_df_bySet, BOW_freq_df], axis=1)
     X_train = full_features_df_bySet.drop(['essay_set', 'count_pos', 'word_features'], axis=1)
     X_train = X_train.as_matrix()  ##X_train is an np array
@@ -471,6 +524,34 @@ for set in sets:
         best_score = reg_rnd_cv(X=X_train, y=y_train, clf=classifiers['gbr']['clf'], n_iter_search=20, param_dist= classifiers['gbr'][str(set)], n_jobs=3)
         print(best_score)
         best_scores[set][clf].append(best_score)
+
+
+#########################XGBOOST###########
+
+clfs = ['gbr']
+best_scores={Set:{clf:[] for clf in clfs} for Set in Sets}
+
+def train_xgb(feature_df, BOW_Dict, score_df, Sets):
+    for Set in Sets:
+        BOW_freq_df = pd.DataFrame.from_dict(BOW_Dict[Set])
+        index = BOW_freq_df.index.values
+        features_df_bySet = feature_df[(feature_df['essay_set'] == Set)].set_index(index)
+        full_features_df_bySet = pd.concat([features_df_bySet, BOW_freq_df], axis=1)
+        X= full_features_df_bySet.drop(['essay_set', 'count_pos', 'word_features'], axis=1)
+        y = score_df[(score_df['essay_set'] == Set)]['domain1_score'].tolist()
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=7)
+        dtrain = xgb.DMatrix(X_train)
+        dtest = xgb.DMatrix(y_train)
+        #evallist = [(dtest, 'eval'), (dtrain, 'train')]
+        xgb_reg = xgb.XGBRegressor(max_depth=3, n_estimators=700, learning_rate=0.1)
+        xgb_reg.fit(X_train, y_train, eval_metric='rmse', early_stopping_rounds=10, eval_set=[(X_test, y_test)], verbose=False)#eval_set=[(X_train, y_train),(X_test, y_test)], verbose=True
+        #predictions = xgb_reg.predict(X_test)
+        pred = xgb_reg.predict(X_test, y_test, ntree_limit=xgb_reg.best_ntree_limit)
+    return    explained_variance_score(pred,y_test)
+
+
+
+train_xgb(full_features_df, full_word_dict, labels, [2])
 
 
 
@@ -506,7 +587,7 @@ essay1 and essay 5 have better predictions, lets take a look at the feature impo
 sets=np.array([1,5])
 
 for set in sets:
-    set = 1
+    #set = 1
     BOW_freq_df = pd.DataFrame.from_dict(full_word_dict[set])
     index = BOW_freq_df.index.values
     features_df_bySet = full_features_df[(full_features_df['essay_set'] == set)].set_index(index)
@@ -550,7 +631,7 @@ param_grid = {'n_estimators':[50, 100, 500, 750, 1000], 'learning_rate':[1, 0.1,
 
 
 for set in sets:
-    set = 8
+    #set = 8
     BOW_freq_df = pd.DataFrame.from_dict(full_word_dict[set])
     index = BOW_freq_df.index.values
     features_df_bySet = full_features_df[(full_features_df['essay_set'] == set)].set_index(index)
