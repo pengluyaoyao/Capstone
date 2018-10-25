@@ -476,14 +476,14 @@ def reg_grid_cv(X, y, clf, params):
     estimator = GridSearchCV(clf, params, cv=3)
     estimator.fit(X, y)
     return estimator.best_score_, estimator.best_estimator_#.feature_importance() #estimator.cv_results_['mean_test_score']
-
+'''
 
 def reg_rnd_cv(X, y, clf, n_iter_search, param_dist, n_jobs):
     random_search = RandomizedSearchCV(clf, param_distributions=param_dist,
                                        n_iter=n_iter_search, cv=3, n_jobs=n_jobs)
     random_search.fit(X, y)
     return random_search.best_score_, random_search.best_estimator_
-'''
+
 
 ##########################CROSS-VALIDATION FOR EACH ESSAY SET#################################
 ####################DEFINING PARAMETERS TO BE TUNED: classifier dictionary INCLUDE 'GBR'####################
@@ -491,43 +491,56 @@ def reg_rnd_cv(X, y, clf, n_iter_search, param_dist, n_jobs):
 classifiers= {#'rf': {'clf': RandomForestRegressor(), 'params': {'n_estimators': np.arange(170, 180, 5)}},
               'gbr':{'clf': ensemble.GradientBoostingRegressor(),
                      '1': {'n_estimators':np.arange(80,400,30), 'max_depth': np.arange(1,20,2),
-                         'min_samples_split': [0.3,0.4,0.5,0.6,0.7,0.8],'learning_rate':np.arange(0.05,0.2,0.02)},
+                         'min_samples_split': [0.3,0.4,0.5,0.6,0.7,0.8],'learning_rate':np.arange(0.05,0.2,0.02), 'validation_fraction': [0.2], 'n_iter_no_change': [10], 'tol': [0.01]},
                      '2': {'n_estimators':np.arange(80,400,30), 'max_depth': np.arange(1,20,2),
-                         'min_samples_split': [0.3,0.4,0.5,0.6,0.7,0.8],'learning_rate':np.arange(0.05,0.2,0.02)},
+                         'min_samples_split': [0.3,0.4,0.5,0.6,0.7,0.8],'learning_rate':np.arange(0.05,0.2,0.02),'validation_fraction': [0.2], 'n_iter_no_change': [10], 'tol': [0.01]},
                      '3': {'n_estimators':np.arange(80,400,30), 'max_depth': np.arange(1,20,2),
-                         'min_samples_split': [0.3,0.4,0.5,0.6,0.7,0.8],'learning_rate':np.arange(0.05,0.2,0.02)},
+                         'min_samples_split': [0.3,0.4,0.5,0.6,0.7,0.8],'learning_rate':np.arange(0.05,0.2,0.02),'validation_fraction': [0.2], 'n_iter_no_change': [10], 'tol': [0.01]},
                      '5': {'n_estimators':np.arange(80,400,30), 'max_depth': np.arange(20,50,5),
-                         'min_samples_split': [0.3,0.4,0.5,0.6,0.7,0.8],'learning_rate':np.arange(0.05,0.2,0.02)},
+                         'min_samples_split': [0.3,0.4,0.5,0.6,0.7,0.8],'learning_rate':np.arange(0.05,0.2,0.02),'validation_fraction': [0.2], 'n_iter_no_change': [10], 'tol': [0.01]},
                      '6': {'n_estimators':np.arange(80,400,30), 'max_depth': np.arange(1,20,2),
-                         'min_samples_split': np.arange(0.05, 0.4,0.05),'learning_rate':np.arange(0.05,0.2,0.02)},
+                         'min_samples_split': np.arange(0.05, 0.4,0.05),'learning_rate':np.arange(0.05,0.2,0.02),'validation_fraction': [0.2], 'n_iter_no_change': [10], 'tol': [0.01]},
                      '7': {'n_estimators':np.arange(400,900,100), 'max_depth': np.arange(1,20,2),
-                         'min_samples_split': np.arange(0.05, 0.4,0.05),'learning_rate':np.arange(0.001,0.011,0.002)},
+                         'min_samples_split': np.arange(0.05, 0.4,0.05),'learning_rate':np.arange(0.001,0.011,0.002),'validation_fraction': [0.2], 'n_iter_no_change': [10], 'tol': [0.01]},
                      '8': {'n_estimators':np.arange(400,900,100), 'max_depth': np.arange(12,20,2),
-                         'min_samples_split': np.arange(0.6,1,0.1),'learning_rate':np.arange(0.05,0.2,0.02)}
+                         'min_samples_split': np.arange(0.6,1,0.1),'learning_rate':np.arange(0.05,0.2,0.02), 'validation_fraction': [0.2], 'n_iter_no_change': [10], 'tol': [0.01]}
                      }
               }
 
 Sets=[1,2,3,5,6,7,8]
+
+
+
+def create_Xy_to_train_model(feature_df, BOW_Dict, score_df, Sets):
+    X_all_sets = {}
+    y_all_sets = {}
+    for Set in Sets:
+        BOW_freq_df = pd.DataFrame.from_dict(BOW_Dict[Set])
+        index = BOW_freq_df.index.values
+        features_df_bySet = feature_df[(feature_df['essay_set'] == Set)].set_index(index)
+        full_features_df_bySet = pd.concat([features_df_bySet, BOW_freq_df], axis=1)
+        X_train = full_features_df_bySet.drop(['essay_set', 'count_pos', 'word_features'], axis=1)
+        X_train = X_train.as_matrix()  ##X_train is an np array
+        y_train = score_df[(score_df['essay_set'] == Set)]['domain1_score'].tolist()##y_train is a list
+        X_all_sets[Set] = X_train
+        y_all_sets[Set] = y_train
+    return X_all_sets, y_all_sets
+
+X_train, y_train = create_Xy_to_train_model(full_features_df, full_word_dict, labels, [1,2,3,5,6,7,8])
+
+
 clfs = ['gbr']
 best_scores={Set:{clf:[] for clf in clfs} for Set in Sets}
-
-for Set in Sets:
-    BOW_freq_df = pd.DataFrame.from_dict(full_word_dict[set])
-    index = BOW_freq_df.index.values
-    features_df_bySet = full_features_df[(full_features_df['essay_set'] == Set)].set_index(index)
-    full_features_df_bySet = pd.concat([features_df_bySet, BOW_freq_df], axis=1)
-    X_train = full_features_df_bySet.drop(['essay_set', 'count_pos', 'word_features'], axis=1)
-    X_train = X_train.as_matrix()  ##X_train is an np array
-    y_train = labels[(labels['essay_set'] == set)]['domain1_score'].tolist()  ##y_train is a list
-    for clf in clfs:
-        #best_score = reg_grid_cv(X_train, y_train, classifiers[clf]['clf'], classifiers[clf]['params'])
-        best_score = reg_rnd_cv(X=X_train, y=y_train, clf=classifiers['gbr']['clf'], n_iter_search=20, param_dist= classifiers['gbr'][str(set)], n_jobs=3)
+for clf in clfs:
+    for Set in Sets:
+    #best_score = reg_grid_cv(X_train, y_train, classifiers[clf]['clf'], classifiers[clf]['params'])
+        best_score = reg_rnd_cv(X=X_train[Set], y=y_train[Set], clf=classifiers['gbr']['clf'], n_iter_search=20, param_dist= classifiers['gbr'][str(Set)], n_jobs=3)
         print(best_score)
-        best_scores[set][clf].append(best_score)
+        best_scores[Set][clf].append(best_score)
 
 
 #########################XGBOOST###########
-
+'''
 clfs = ['gbr']
 best_scores={Set:{clf:[] for clf in clfs} for Set in Sets}
 
@@ -552,14 +565,14 @@ def train_xgb(feature_df, BOW_Dict, score_df, Sets):
 
 
 train_xgb(full_features_df, full_word_dict, labels, [2])
-
+'''
 
 
 
 ###############regression model comparisons bar plot###############################
 import matplotlib.pyplot as plt
 
-bar_offsets = (np.arange(len(sets))*(len(clfs) + 1) + .5)
+bar_offsets = (np.arange(len(Sets))*(len(clfs) + 1) + .5)
 plt.figure()
 COLORS = 'bgrcmyk'
 
