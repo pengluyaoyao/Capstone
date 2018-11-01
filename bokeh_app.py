@@ -258,14 +258,21 @@ def create_features(essay, feature_functions):
 '''
 PREDICTIONS USING GRADIENT BOOSTING REGRESSOR
 '''
-param_dict = {}
+param_dict = {'prompt1': {'learning_rate': 0.13, 'max_depth': 9, 'min_samples_split' : 0.7, 'n_estimators': 80},
+              'prompt5': {'learning_rate': 0.17, 'max_depth': 35, 'min_samples_split' : 0.5, 'n_estimators': 80}}
 def predictions_gbr(x_test, category):
+    param = param_dict[category]
+    alpha = 0.95
+    clf = GradientBoostingRegressor(loss='quantile', n_estimators=param['n_estimators'], max_depth=param['max_depth'],
+                                learning_rate=param['learning_rate'], alpha = alpha,
+                                min_samples_split=param['min_samples_split'])
+    y_upper= clf.predict(x_test)
+    clf.set_params(alpha=1.0 - alpha)
+    y_lower = clf.predict(x_test)
 
-    clf = GradientBoostingRegressor(loss='quantile', alpha=alpha,
-                                n_estimators=250, max_depth=3,
-                                learning_rate=.1, min_samples_leaf=9,
-                                min_samples_split=9)
+    clf.set_params(loss='ls')
     y_pred = clf.predict(x_test)
+    return y_pred, y_upper, y_lower
 
 ################################################
 ###### APP DEVELOPMENT (PUTTING TOGETHER) #######
