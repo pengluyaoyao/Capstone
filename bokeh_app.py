@@ -258,8 +258,8 @@ def create_features(essay, feature_functions):
 '''
 PREDICTIONS USING GRADIENT BOOSTING REGRESSOR
 '''
-param_dict = {'prompt1': {'learning_rate': 0.13, 'max_depth': 9, 'min_samples_split' : 0.7, 'n_estimators': 80},
-              'prompt5': {'learning_rate': 0.17, 'max_depth': 35, 'min_samples_split' : 0.5, 'n_estimators': 80}}
+param_dict = {'Prompt1': {'learning_rate': 0.13, 'max_depth': 9, 'min_samples_split' : 0.7, 'n_estimators': 80},
+              'Prompt5': {'learning_rate': 0.17, 'max_depth': 35, 'min_samples_split' : 0.5, 'n_estimators': 80}}
 def predictions_gbr(x_test, category):
     param = param_dict[category]
     alpha = 0.95
@@ -272,7 +272,8 @@ def predictions_gbr(x_test, category):
 
     clf.set_params(loss='ls')
     y_pred = clf.predict(x_test)
-    return y_pred, y_upper, y_lower
+    pred_dict = {'y_pred': y_pred, 'y_upper': y_upper, 'y_lower': y_lower}
+    return pred_dict
 
 ################################################
 ###### APP DEVELOPMENT (PUTTING TOGETHER) #######
@@ -295,9 +296,10 @@ def show_results():
 
     plot = create_figures(feature_1or5_df, features)
 
+    predictions_dict = predictions_gbr(feature_values_list, category)
     script2, div2 = components(plot)
 
-    return render_template('about.html', feature_values_dict = feature_values_dict, script2=script2, div2=div2) #ticker_name=ticker_name, col_active0=col_active0) #col_active1=col_active1,
+    return render_template('about.html', predictions_dict = predictions_dict, feature_values_dict = feature_values_dict, script2=script2, div2=div2) #ticker_name=ticker_name, col_active0=col_active0) #col_active1=col_active1,
 
 if __name__ == '__main__':
     bokeh_app.run(port=5000)
