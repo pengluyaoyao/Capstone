@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Intelligent Essay Grader</title>
+
+    <link
+    href="https://cdn.pydata.org/bokeh/release/bokeh-0.13.0.min.css" rel="stylesheet" type="text/css">
+<link href="https://cdn.pydata.org/bokeh/release/bokeh-widgets-0.13.0.min.css" rel="stylesheet" type="text/css">
+</head>
+
+    <body>
+<h1> </h1>
+<script src="https://cdn.pydata.org/bokeh/release/bokeh-0.13.0.min.js"></script>
+<script src="https://cdn.pydata.org/bokeh/release/bokeh-widgets-0.13.0.min.js"></script>
+
+      <table border = 1>
+         {% for key, value in feature_values_dict.items() %}
+
+            <tr>
+               <th> {{ key }} </th>
+               <td> {{ value }} </td>
+            </tr>
+
+         {% endfor %}
+      </table>
+<!-- script and div elements for Bokeh plot -->
+
+<p>
+{{ script2|safe }}
+{{ div2|safe }}
+</p>
+
+
+</body>
+</html>

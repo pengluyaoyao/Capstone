@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Intelligent Essay Grader</title>
+
+    <link
+    href="https://cdn.pydata.org/bokeh/release/bokeh-0.13.0.min.css"
+    rel="stylesheet" type="text/css">
+<link
+    href="https://cdn.pydata.org/bokeh/release/bokeh-widgets-0.13.0.min.css"
+    rel="stylesheet" type="text/css">
+
+<script src="https://cdn.pydata.org/bokeh/release/bokeh-0.13.0.min.js"></script>
+<script src="https://cdn.pydata.org/bokeh/release/bokeh-widgets-0.13.0.min.js"></script>
+
+
+</head>
+<body>
+<div class=page>
+<h1> Intelligent Essay Grader</h1>
+</div>
+
+<form id='input' method='post' action='/results'>
+    <p><font size="4" face="verdana" color="green">Write your essay here: </font></p>
+    <p>
+         <textarea name="text" rows="14" cols="54" wrap="soft"> </textarea>
+    </p>
+    <p><font size="4" face="verdana" color="green">Select the Prompt: </font></p>
+        <input type="radio" name='check' value="Prompt1"> Prompt #1<br>
+
+        <input type="radio" name='check' value="Prompt5"> Prompt #5<br>
+
+    <p><font size="4" face="verdana" color="green">Show descriptive results for following features: </font></p>
+        <input type="checkbox" name='select' value="count_lemma"> The Number of Lemma <br>
+        <input type="checkbox" name='select' value="sentence_number"> The Number of Sentences <br>
+    <input type="submit">
+</form>
+
+</body>
+</html>

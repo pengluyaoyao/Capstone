@@ -1,11 +1,8 @@
 import numpy as np
 import pandas as pd
-import xlrd
 import matplotlib.pyplot as plt
 import re, collections
-from sklearn.ensemble import RandomForestRegressor
 from sklearn.feature_extraction.text import TfidfVectorizer
-from itertools import chain
 import nltk
 from nltk.tokenize import sent_tokenize
 from nltk.tokenize import word_tokenize
@@ -80,7 +77,7 @@ def tokenize(essay):
 
     return tokenized_sentences
 
-
+'''
 def get_clean_essay(essay):
     clean_essay = re.sub(r'\W', ' ', essay)
     return clean_essay
@@ -95,6 +92,7 @@ def get_sent_list(essay):
 
         sent_list.append(clean_sentence)
     return sent_list
+'''
 
 def get_big_dict():
     big = open('big.txt').read()
@@ -105,7 +103,7 @@ def get_big_dict():
     #creating correct word dictionary
     for word in words_:
         big_dict[word] += 1
-    return(big_dict)
+    return big_dict
 
 
 #######################################
@@ -247,7 +245,7 @@ def count_spell_error(essay):
     mispell_count = 0
 
     words = clean_essay.split()
-
+    big_dict = get_big_dict()
     for word in words:
         if not word in big_dict:
             mispell_count += 1
@@ -318,7 +316,7 @@ feature_test, Dict_test = creating_features(test_data)
 #######################################################
 import dill
 
-Dict = dill.load(open('featurs_dict.pkd', 'rb'))
+Dict = dill.load(open('features_dict.pkd', 'rb'))
 features = dill.load(open('features.pkd', 'rb'))
 Dict['total word_count'].pop('0',None)
 
@@ -477,9 +475,9 @@ def reg_grid_cv(X, y, clf, params):
     estimator.fit(X, y)
     return estimator.best_score_, estimator.best_estimator_#.feature_importance() #estimator.cv_results_['mean_test_score']
 '''
-
+scoring = {'MSE':'neg_mean_squared_error', 'MAE':'neg_median_absolute_error', 'EV': 'explained_variance', 'R2': 'r2'}
 def reg_rnd_cv(X, y, clf, n_iter_search, param_dist, n_jobs):
-    random_search = RandomizedSearchCV(clf, param_distributions=param_dist,
+    random_search = RandomizedSearchCV(clf, param_distributions=param_dist, scoring=scoring, refit='EV',
                                        n_iter=n_iter_search, cv=3, n_jobs=n_jobs)
     random_search.fit(X, y)
     return random_search.best_score_, random_search.best_estimator_
@@ -490,26 +488,31 @@ def reg_rnd_cv(X, y, clf, n_iter_search, param_dist, n_jobs):
 
 classifiers= {#'rf': {'clf': RandomForestRegressor(), 'params': {'n_estimators': np.arange(170, 180, 5)}},
               'gbr':{'clf': ensemble.GradientBoostingRegressor(),
-                     '1': {'n_estimators':np.arange(80,400,30), 'max_depth': np.arange(1,20,2),
-                         'min_samples_split': [0.3,0.4,0.5,0.6,0.7,0.8],'learning_rate':np.arange(0.05,0.2,0.02), 'validation_fraction': [0.2], 'n_iter_no_change': [10], 'tol': [0.01]},
-                     '2': {'n_estimators':np.arange(80,400,30), 'max_depth': np.arange(1,20,2),
-                         'min_samples_split': [0.3,0.4,0.5,0.6,0.7,0.8],'learning_rate':np.arange(0.05,0.2,0.02),'validation_fraction': [0.2], 'n_iter_no_change': [10], 'tol': [0.01]},
-                     '3': {'n_estimators':np.arange(80,400,30), 'max_depth': np.arange(1,20,2),
-                         'min_samples_split': [0.3,0.4,0.5,0.6,0.7,0.8],'learning_rate':np.arange(0.05,0.2,0.02),'validation_fraction': [0.2], 'n_iter_no_change': [10], 'tol': [0.01]},
-                     '5': {'n_estimators':np.arange(80,400,30), 'max_depth': np.arange(20,50,5),
-                         'min_samples_split': [0.3,0.4,0.5,0.6,0.7,0.8],'learning_rate':np.arange(0.05,0.2,0.02),'validation_fraction': [0.2], 'n_iter_no_change': [10], 'tol': [0.01]},
-                     '6': {'n_estimators':np.arange(80,400,30), 'max_depth': np.arange(1,20,2),
-                         'min_samples_split': np.arange(0.05, 0.4,0.05),'learning_rate':np.arange(0.05,0.2,0.02),'validation_fraction': [0.2], 'n_iter_no_change': [10], 'tol': [0.01]},
-                     '7': {'n_estimators':np.arange(400,900,100), 'max_depth': np.arange(1,20,2),
-                         'min_samples_split': np.arange(0.05, 0.4,0.05),'learning_rate':np.arange(0.001,0.011,0.002),'validation_fraction': [0.2], 'n_iter_no_change': [10], 'tol': [0.01]},
-                     '8': {'n_estimators':np.arange(400,900,100), 'max_depth': np.arange(12,20,2),
-                         'min_samples_split': np.arange(0.6,1,0.1),'learning_rate':np.arange(0.05,0.2,0.02), 'validation_fraction': [0.2], 'n_iter_no_change': [10], 'tol': [0.01]}
+                     '1': {'n_estimators':[80], 'max_depth': [9],
+                         'min_samples_split': [0.7],'learning_rate':[0.13],
+                           'validation_fraction': [0.2], 'n_iter_no_change': [10], 'tol': [0.01]},
+                     '2': {'n_estimators':np.arange(300,330,5), 'max_depth': [7,8,9,10,11,12],'subsample':np.arange(0.3,0.9,0.1),
+                         'min_samples_split': [0.45,0.47,0.5,0.55,0.57],'learning_rate':np.arange(0.14,0.16,0.005),
+                           'validation_fraction': [0.2], 'n_iter_no_change': [10], 'tol': [0.01]},
+                     '3': {'n_estimators':np.arange(200,250,10), 'max_depth': np.arange(1,20,2),'subsample':np.arange(0.3,0.9,0.1),
+                         'min_samples_split': [0.45,0.47,0.5,0.55,0.57],'learning_rate':np.arange(0.10,0.12,0.01),
+                           'validation_fraction': [0.2], 'n_iter_no_change': [10], 'tol': [0.01]},
+                     '5': {'n_estimators':[80], 'max_depth': [35],
+                         'min_samples_split': [0.5],'learning_rate':[0.17000000000000004],
+                           'validation_fraction': [0.2], 'n_iter_no_change': [10], 'tol': [0.01]},
+                     '6': {'n_estimators':np.arange(90,130,10), 'max_depth': np.arange(1,20,2),'subsample':np.arange(0.3,0.9,0.1),
+                         'min_samples_split': np.arange(0.1, 0.2,0.02),'learning_rate':np.arange(0.1,0.15,0.01),
+                           'validation_fraction': [0.2], 'n_iter_no_change': [10], 'tol': [0.01]},
+                     '7': {'n_estimators':np.arange(700,900,50), 'max_depth': np.arange(1,20,2),'subsample':np.arange(0.3,0.9,0.1),
+                         'min_samples_split': np.arange(0.05, 0.4,0.05),'learning_rate':np.arange(0.001,0.011,0.002),
+                           'validation_fraction': [0.2], 'n_iter_no_change': [10], 'tol': [0.01]},
+                     '8': {'n_estimators':np.arange(600,800,50), 'max_depth': np.arange(12,16,1),'subsample':np.arange(0.3,0.9,0.1),
+                         'min_samples_split': np.arange(0.6,1,0.1),'learning_rate':np.arange(0.15,0.2,0.01),
+                           'validation_fraction': [0.2], 'n_iter_no_change': [10], 'tol': [0.01]}
                      }
               }
 
-Sets=[1,2,3,5,6,7,8]
-
-
+Sets=[1,5]
 
 def create_Xy_to_train_model(feature_df, BOW_Dict, score_df, Sets):
     X_all_sets = {}
@@ -534,9 +537,9 @@ best_scores={Set:{clf:[] for clf in clfs} for Set in Sets}
 for clf in clfs:
     for Set in Sets:
     #best_score = reg_grid_cv(X_train, y_train, classifiers[clf]['clf'], classifiers[clf]['params'])
-        best_score = reg_rnd_cv(X=X_train[Set], y=y_train[Set], clf=classifiers['gbr']['clf'], n_iter_search=20, param_dist= classifiers['gbr'][str(Set)], n_jobs=3)
+        best_score = reg_rnd_cv(X=X_train[Set], y=y_train[Set], clf=classifiers['gbr']['clf'], n_iter_search=1, param_dist= classifiers['gbr'][str(Set)], n_jobs=3)
         print(best_score)
-        best_scores[Set][clf].append(best_score)
+        #best_scores[Set][clf].append(best_score)
 
 
 #########################XGBOOST###########
@@ -578,14 +581,14 @@ COLORS = 'bgrcmyk'
 
 for i, clf in enumerate(clfs):
     clf_best_scores=[]
-    for set in sets:
+    for Set in Sets:
         clf_best_scores.extend(best_scores[set][clf])
         clf_best_scores_array = np.asarray(clf_best_scores)
     plt.bar(bar_offsets + i/2, clf_best_scores_array, label=clf, color=COLORS[i])
 
 plt.title("Comparing Different Regression Predictions")
 plt.xlabel('Essay Sets')
-plt.xticks(bar_offsets + 3/2, sets)
+plt.xticks(bar_offsets + 3/2, Sets)
 plt.ylabel('R square')
 plt.ylim((0, 1))
 plt.legend(loc='upper right')
