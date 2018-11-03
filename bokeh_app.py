@@ -191,12 +191,6 @@ def count_lemmas(essay):
 
     return lemma_count
 
-def BOW2(essay):
-    vectorizer = TfidfVectorizer(ngram_range=(1, 2), max_df=1.0, min_df=1, max_features=500, stop_words='english')
-    feature_matrix = vectorizer.fit_transform(essay)
-    feature_names = vectorizer.get_feature_names()
-    return feature_names, feature_matrix
-
 def count_spell_error(essay):
     clean_essay = re.sub(r'\W', ' ', str(essay).lower())
     clean_essay = re.sub(r'[0-9]', '', clean_essay)
@@ -275,9 +269,11 @@ def predictions_gbr(x_test, category):
     pred_dict = {'y_pred': y_pred, 'y_upper': y_upper, 'y_lower': y_lower}
     return pred_dict
 
-################################################
-###### APP DEVELOPMENT (PUTTING TOGETHER) #######
-#################################################
+##################################################################################################
+#################################################################################################
+###############################  APP DEVELOPMENT (PUTTING TOGETHER) ###############################
+##################################################################################################
+##################################################################################################
 
 @bokeh_app.route('/')
 def index():

@@ -469,12 +469,12 @@ from sklearn import ensemble
 import xgboost as xgb
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import explained_variance_score
-'''
+
 def reg_grid_cv(X, y, clf, params):
     estimator = GridSearchCV(clf, params, cv=3)
     estimator.fit(X, y)
     return estimator.best_score_, estimator.best_estimator_#.feature_importance() #estimator.cv_results_['mean_test_score']
-'''
+
 scoring = {'MSE':'neg_mean_squared_error', 'MAE':'neg_median_absolute_error', 'EV': 'explained_variance', 'R2': 'r2'}
 def reg_rnd_cv(X, y, clf, n_iter_search, param_dist, n_jobs):
     random_search = RandomizedSearchCV(clf, param_distributions=param_dist, scoring=scoring, refit='EV',
@@ -485,11 +485,12 @@ def reg_rnd_cv(X, y, clf, n_iter_search, param_dist, n_jobs):
 
 ##########################CROSS-VALIDATION FOR EACH ESSAY SET#################################
 ####################DEFINING PARAMETERS TO BE TUNED: classifier dictionary INCLUDE 'GBR'####################
+import pickle
 
 classifiers= {#'rf': {'clf': RandomForestRegressor(), 'params': {'n_estimators': np.arange(170, 180, 5)}},
               'gbr':{'clf': ensemble.GradientBoostingRegressor(),
-                     '1': {'n_estimators':[80], 'max_depth': [9],
-                         'min_samples_split': [0.7],'learning_rate':[0.13],
+                     '1': {'n_estimators':[80], 'max_depth': [9], 'random_state': [42],
+                         'min_samples_split': [0.7],'learning_rate':[0.13], 'warm_start':['True'],
                            'validation_fraction': [0.2], 'n_iter_no_change': [10], 'tol': [0.01]},
                      '2': {'n_estimators':np.arange(300,330,5), 'max_depth': [7,8,9,10,11,12],'subsample':np.arange(0.3,0.9,0.1),
                          'min_samples_split': [0.45,0.47,0.5,0.55,0.57],'learning_rate':np.arange(0.14,0.16,0.005),
@@ -497,8 +498,8 @@ classifiers= {#'rf': {'clf': RandomForestRegressor(), 'params': {'n_estimators':
                      '3': {'n_estimators':np.arange(200,250,10), 'max_depth': np.arange(1,20,2),'subsample':np.arange(0.3,0.9,0.1),
                          'min_samples_split': [0.45,0.47,0.5,0.55,0.57],'learning_rate':np.arange(0.10,0.12,0.01),
                            'validation_fraction': [0.2], 'n_iter_no_change': [10], 'tol': [0.01]},
-                     '5': {'n_estimators':[80], 'max_depth': [35],
-                         'min_samples_split': [0.5],'learning_rate':[0.17000000000000004],
+                     '5': {'n_estimators':[80], 'max_depth': [35], 'random_state': [43],
+                         'min_samples_split': [0.5],'learning_rate':[0.17000000000000004],'warm_start':['True'],
                            'validation_fraction': [0.2], 'n_iter_no_change': [10], 'tol': [0.01]},
                      '6': {'n_estimators':np.arange(90,130,10), 'max_depth': np.arange(1,20,2),'subsample':np.arange(0.3,0.9,0.1),
                          'min_samples_split': np.arange(0.1, 0.2,0.02),'learning_rate':np.arange(0.1,0.15,0.01),
@@ -514,32 +515,85 @@ classifiers= {#'rf': {'clf': RandomForestRegressor(), 'params': {'n_estimators':
 
 Sets=[1,5]
 
-def create_Xy_to_train_model(feature_df, BOW_Dict, score_df, Sets):
+def create_Xy_to_train_model(feature_df, score_df, Sets):
     X_all_sets = {}
     y_all_sets = {}
     for Set in Sets:
-        BOW_freq_df = pd.DataFrame.from_dict(BOW_Dict[Set])
-        index = BOW_freq_df.index.values
-        features_df_bySet = feature_df[(feature_df['essay_set'] == Set)].set_index(index)
-        full_features_df_bySet = pd.concat([features_df_bySet, BOW_freq_df], axis=1)
-        X_train = full_features_df_bySet.drop(['essay_set', 'count_pos', 'word_features'], axis=1)
-        X_train = X_train.as_matrix()  ##X_train is an np array
+        #BOW_freq_df = pd.DataFrame.from_dict(BOW_Dict[Set])
+        #index = BOW_freq_df.index.values
+        #features_df_bySet = feature_df[(feature_df['essay_set'] == Set)].set_index(index)
+        #full_features_df_bySet = pd.concat([features_df_bySet, BOW_freq_df], axis=1)
+        #X_train = full_features_df_bySet.drop(['essay_set', 'count_pos', 'word_features'], axis=1)
+        #X_train = X_train.as_matrix()  ##X_train is an np array
+        features_df_bySet = feature_df[(feature_df['essay_set'] == Set)]
+        X_train = features_df_bySet.drop(['essay_set', 'count_pos', 'word_features'], axis=1)
+        X_train = X_train.as_matrix()
         y_train = score_df[(score_df['essay_set'] == Set)]['domain1_score'].tolist()##y_train is a list
         X_all_sets[Set] = X_train
         y_all_sets[Set] = y_train
     return X_all_sets, y_all_sets
 
-X_train, y_train = create_Xy_to_train_model(full_features_df, full_word_dict, labels, [1,2,3,5,6,7,8])
+X_train, y_train = create_Xy_to_train_model(full_features_df, labels, [1,5])
 
-
+#######random search cv
 clfs = ['gbr']
 best_scores={Set:{clf:[] for clf in clfs} for Set in Sets}
-for clf in clfs:
-    for Set in Sets:
-    #best_score = reg_grid_cv(X_train, y_train, classifiers[clf]['clf'], classifiers[clf]['params'])
-        best_score = reg_rnd_cv(X=X_train[Set], y=y_train[Set], clf=classifiers['gbr']['clf'], n_iter_search=1, param_dist= classifiers['gbr'][str(Set)], n_jobs=3)
-        print(best_score)
+
+def cv(clfs, grid_cv):
+    for clf in clfs:
+        for Set in Sets:
+        #best_score = reg_grid_cv(X_train, y_train, classifiers[clf]['clf'], classifiers[clf]['params'])
+            if grid_cv == False:
+                best_score = reg_rnd_cv(X=X_train[Set], y=y_train[Set], clf=classifiers[clf]['clf'], n_iter_search=1, param_dist= classifiers['gbr'][str(Set)], n_jobs=3)
+                print(best_score)
+            else:
+                best_score = reg_grid_cv(X=X_train[Set], y=y_train[Set], clf=classifiers[clf]['clf'], params=classifiers['gbr'][str(Set)])
+                print(best_score)
         #best_scores[Set][clf].append(best_score)
+
+cv(clfs, grid_cv=True)
+
+
+#########################FINAL MODELS (ESSAY1 AND 5 ONLY) ###############
+alpha = 0.95
+clf1 = ensemble.GradientBoostingRegressor(alpha=alpha, criterion='friedman_mse', init=None,
+             learning_rate=0.13, loss='ls', max_depth=9, max_features=None,
+             max_leaf_nodes=None, min_impurity_decrease=0.0,
+             min_impurity_split=None, min_samples_leaf=1,
+             min_samples_split=0.7, min_weight_fraction_leaf=0.0,
+             n_estimators=80, n_iter_no_change=10, presort='auto',
+             random_state=42, subsample=1.0, tol=0.01,
+             validation_fraction=0.2, verbose=0, warm_start=False)
+clf1.fit(X_train[1], y_train[1])
+
+filename = 'upper_model_set1.pickle'
+pickle.dump(clf1, open(filename, 'wb'))
+
+clf1.set_params(alpha=1.0 - alpha)
+clf1.fit(X_train[1], y_train[1])
+filename = 'lower_model_set1.pickle'
+pickle.dump(clf1, open(filename, 'wb'))
+
+alpha = 0.95
+clf5 = ensemble.GradientBoostingRegressor(alpha=alpha, criterion='friedman_mse', init=None,
+             learning_rate=0.17000000000000004, loss='ls', max_depth=35,
+             max_features=None, max_leaf_nodes=None,
+             min_impurity_decrease=0.0, min_impurity_split=None,
+             min_samples_leaf=1, min_samples_split=0.5,
+             min_weight_fraction_leaf=0.0, n_estimators=80,
+             n_iter_no_change=10, presort='auto', random_state=43,
+             subsample=1.0, tol=0.01, validation_fraction=0.2, verbose=0,
+             warm_start=False)
+
+clf5.fit(X_train[5], y_train[5])
+
+filename = 'upper_model_set5.pickle'
+pickle.dump(clf5, open(filename, 'wb'))
+
+clf5.set_params(alpha=1.0 - alpha)
+clf5.fit(X_train[5], y_train[5])
+filename = 'lower_model_set5.pickle'
+pickle.dump(clf5, open(filename, 'wb'))
 
 
 #########################XGBOOST###########
@@ -687,14 +741,5 @@ def plot_learning_curve(estimator, title, X, y, ylim=None, cv=None, n_jobs=1, tr
 plot_learning_curve(estimator2, title, X_train, y_train, cv=5, n_jobs=1)
 plt.title('Learning Curves (Essay_set 8): n_estimators=750, max_depth=4,  learning_rate=0.005')
 plt.show()
-
-
-
-import scholarly
-search_query = scholarly.search_pubs_query('Chaos theory and strategy: Theory, application, and managerial implications')
-author = next(search_query).fill()
-results = [print(citation.bib['title']) for citation in author.get_citedby()]
-
-results = [citation.bib['title'] for citation in author.get_citedby()]
 
 
