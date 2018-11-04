@@ -252,22 +252,20 @@ def create_features(essay, feature_functions):
 '''
 PREDICTIONS USING GRADIENT BOOSTING REGRESSOR
 '''
-param_dict = {'Prompt1': {'learning_rate': 0.13, 'max_depth': 9, 'min_samples_split' : 0.7, 'n_estimators': 80},
-              'Prompt5': {'learning_rate': 0.17, 'max_depth': 35, 'min_samples_split' : 0.5, 'n_estimators': 80}}
-def predictions_gbr(x_test, category):
-    param = param_dict[category]
-    alpha = 0.95
-    clf = GradientBoostingRegressor(loss='quantile', n_estimators=param['n_estimators'], max_depth=param['max_depth'],
-                                learning_rate=param['learning_rate'], alpha = alpha,
-                                min_samples_split=param['min_samples_split'])
-    y_upper= clf.predict(x_test)
-    clf.set_params(alpha=1.0 - alpha)
-    y_lower = clf.predict(x_test)
+import pickle
 
-    clf.set_params(loss='ls')
-    y_pred = clf.predict(x_test)
-    pred_dict = {'y_pred': y_pred, 'y_upper': y_upper, 'y_lower': y_lower}
-    return pred_dict
+def predictions_gbr(x_test, category):
+    if category == 1:
+        score_model = pickle.load(open('score_model_set1.pickle', 'rb'))
+        pred = score_model.predict(x_test)
+        y_upper = pred+2*(0.6106829419850511**0.5)
+        y_lower = pred-2*(0.6106829419850511**0.5)
+    else:
+        score_model = pickle.load(open('score_model_set5.pickle', 'rb'))
+        pred = score_model.predict(x_test)
+        y_upper = pred+2*(0.28391495746239453**0.5)
+        y_lower = pred-2*(0.28391495746239453**0.5)
+    return {'predicted score: ': pred, 'grade interval (90%)': (y_lower, y_upper)}
 
 ##################################################################################################
 #################################################################################################
@@ -292,7 +290,7 @@ def show_results():
 
     plot = create_figures(feature_1or5_df, features)
 
-    predictions_dict = predictions_gbr(feature_values_list, category)
+    predictions_dict = predictions_gbr(np.reshape(feature_values_list, (1,-1)), category)
     script2, div2 = components(plot)
 
     return render_template('about.html', predictions_dict = predictions_dict, feature_values_dict = feature_values_dict, script2=script2, div2=div2) #ticker_name=ticker_name, col_active0=col_active0) #col_active1=col_active1,

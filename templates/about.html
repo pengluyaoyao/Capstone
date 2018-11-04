@@ -14,6 +14,8 @@
 <script src="https://cdn.pydata.org/bokeh/release/bokeh-0.13.0.min.js"></script>
 <script src="https://cdn.pydata.org/bokeh/release/bokeh-widgets-0.13.0.min.js"></script>
 
+
+<h2><font size="4" face="verdana" color="green">Predicted Score Interval (90%):  </font></h2>
       <table border = 1>
          {% for key, value in predictions_dict.items() %}
 
@@ -24,6 +26,8 @@
 
          {% endfor %}
       </table>
+
+<h2><font size="4" face="verdana" color="green">Summary Statistics: </font></h2>
 
       <table border = 1>
          {% for key, value in feature_values_dict.items() %}

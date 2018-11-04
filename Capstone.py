@@ -470,8 +470,10 @@ import xgboost as xgb
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import explained_variance_score
 
+####building custom scorer
+
 def reg_grid_cv(X, y, clf, params):
-    estimator = GridSearchCV(clf, params, cv=3)
+    estimator = GridSearchCV(clf, params, scoring = 'neg_mean_squared_error', cv=3)
     estimator.fit(X, y)
     return estimator.best_score_, estimator.best_estimator_#.feature_importance() #estimator.cv_results_['mean_test_score']
 
@@ -539,25 +541,22 @@ X_train, y_train = create_Xy_to_train_model(full_features_df, labels, [1,5])
 clfs = ['gbr']
 best_scores={Set:{clf:[] for clf in clfs} for Set in Sets}
 
-def cv(clfs, grid_cv):
+def cv(clfs, grid_cv, Set):
     for clf in clfs:
-        for Set in Sets:
         #best_score = reg_grid_cv(X_train, y_train, classifiers[clf]['clf'], classifiers[clf]['params'])
-            if grid_cv == False:
-                best_score = reg_rnd_cv(X=X_train[Set], y=y_train[Set], clf=classifiers[clf]['clf'], n_iter_search=1, param_dist= classifiers['gbr'][str(Set)], n_jobs=3)
-                print(best_score)
-            else:
-                best_score = reg_grid_cv(X=X_train[Set], y=y_train[Set], clf=classifiers[clf]['clf'], params=classifiers['gbr'][str(Set)])
-                print(best_score)
+        if grid_cv == False:
+            best_score = reg_rnd_cv(X=X_train[Set], y=y_train[Set], clf=classifiers[clf]['clf'], n_iter_search=1, param_dist= classifiers['gbr'][str(Set)], n_jobs=3)
+        else:
+            best_score = reg_grid_cv(X=X_train[Set], y=y_train[Set], clf=classifiers[clf]['clf'], params=classifiers['gbr'][str(Set)])
         #best_scores[Set][clf].append(best_score)
-
-cv(clfs, grid_cv=True)
-
+        return best_score
 
 #########################FINAL MODELS (ESSAY1 AND 5 ONLY) ###############
+
+###### QUANTILE REGRESSION
 alpha = 0.95
 clf1 = ensemble.GradientBoostingRegressor(alpha=alpha, criterion='friedman_mse', init=None,
-             learning_rate=0.13, loss='ls', max_depth=9, max_features=None,
+             learning_rate=0.13, loss='quantile', max_depth=9, max_features=None,
              max_leaf_nodes=None, min_impurity_decrease=0.0,
              min_impurity_split=None, min_samples_leaf=1,
              min_samples_split=0.7, min_weight_fraction_leaf=0.0,
@@ -576,7 +575,7 @@ pickle.dump(clf1, open(filename, 'wb'))
 
 alpha = 0.95
 clf5 = ensemble.GradientBoostingRegressor(alpha=alpha, criterion='friedman_mse', init=None,
-             learning_rate=0.17000000000000004, loss='ls', max_depth=35,
+             learning_rate=0.17000000000000004, loss='quantile', max_depth=35,
              max_features=None, max_leaf_nodes=None,
              min_impurity_decrease=0.0, min_impurity_split=None,
              min_samples_leaf=1, min_samples_split=0.5,
@@ -594,6 +593,58 @@ clf5.set_params(alpha=1.0 - alpha)
 clf5.fit(X_train[5], y_train[5])
 filename = 'lower_model_set5.pickle'
 pickle.dump(clf5, open(filename, 'wb'))
+
+####### SCORE PREDICTION
+clf1 = ensemble.GradientBoostingRegressor(alpha=alpha, criterion='friedman_mse', init=None,
+             learning_rate=0.13, loss='ls', max_depth=9, max_features=None,
+             max_leaf_nodes=None, min_impurity_decrease=0.0,
+             min_impurity_split=None, min_samples_leaf=1,
+             min_samples_split=0.7, min_weight_fraction_leaf=0.0,
+             n_estimators=80, n_iter_no_change=10, presort='auto',
+             random_state=42, subsample=1.0, tol=0.01,
+             validation_fraction=0.2, verbose=0, warm_start=False)
+clf1.fit(X_train[1], y_train[1])
+
+filename = 'score_model_set1.pickle'
+pickle.dump(clf1, open(filename, 'wb'))
+
+clf5 = ensemble.GradientBoostingRegressor(alpha=alpha, criterion='friedman_mse', init=None,
+             learning_rate=0.17000000000000004, loss='ls', max_depth=35,
+             max_features=None, max_leaf_nodes=None,
+             min_impurity_decrease=0.0, min_impurity_split=None,
+             min_samples_leaf=1, min_samples_split=0.5,
+             min_weight_fraction_leaf=0.0, n_estimators=80,
+             n_iter_no_change=10, presort='auto', random_state=43,
+             subsample=1.0, tol=0.01, validation_fraction=0.2, verbose=0,
+             warm_start=False)
+
+clf1.fit(X_train[5], y_train[5])
+
+filename = 'score_model_set5.pickle'
+pickle.dump(clf5, open(filename, 'wb'))
+
+
+####### Distribution Estimator for the prediction interval
+best_score1, best_estimator1 = cv(clfs, grid_cv=True, Set=1)  #best score is neg mse
+best_score5, best_estimator5 = cv(clfs, grid_cv=True, Set=5)  #best score is neg mse
+
+st_dev1 = best_score1 #0.6106829419850511
+st_dev5 = best_score5 #0.28391495746239453
+
+def predictions_gbr(x_test, category):
+    if category == 1:
+        score_model = pickle.load(open('score_model_set1.pickle', 'rb'))
+        pred = score_model.predict(x_test)
+        y_upper = pred+2*(0.6106829419850511**0.5)
+        y_lower = pred-2*(0.6106829419850511**0.5)
+    else:
+        score_model = pickle.load(open('score_model_set5.pickle', 'rb'))
+        pred = score_model.predict(x_test)
+        y_upper = pred+2*(0.28391495746239453**0.5)
+        y_lower = pred-2*(0.28391495746239453**0.5)
+    return {'predicted score: ': pred, 'grade interval (90%)': (y_lower, y_upper)}
+
+
 
 
 #########################XGBOOST###########
