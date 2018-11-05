@@ -618,7 +618,7 @@ clf5 = ensemble.GradientBoostingRegressor(alpha=alpha, criterion='friedman_mse',
              subsample=1.0, tol=0.01, validation_fraction=0.2, verbose=0,
              warm_start=False)
 
-clf1.fit(X_train[5], y_train[5])
+clf5.fit(X_train[5], y_train[5])
 
 filename = 'score_model_set5.pickle'
 pickle.dump(clf5, open(filename, 'wb'))
@@ -794,3 +794,29 @@ plt.title('Learning Curves (Essay_set 8): n_estimators=750, max_depth=4,  learni
 plt.show()
 
 
+import pylanguagetool
+import os
+
+new_essay = 'I think that computers have a positive effect on people. I say this because they help out a lot. They have many diffrent capabilities. Read on to find more on why I think that computers have a positive effect. My first reason is that people can communicate with friends they havent seen in a long time. This is a good thing because if you lost contact with a friend you could find him on the internet. Also you can keep touch with friends and family if they go to far places to see to see how they\'re doing. Lastly, you can keep in contact with pepole you havent seen in years. This is why I think that computers have a positive effect on people. My @CAPS1 reason is you can write stuff and type it into the computer. I think this is good because what if a person has messy handwritting and they have to write something for their job. They can just type it into the computer and and print it and it out neat. Also you can send letters to through the computer. This is another reason why I think that computer a positive effect on people. You should agree with me on this. My last reason uis that if you have a computer you can actually play games that can make you think faster and you can also by things of the internet instead of going to be store. Like if the store ran out of the thing you wanted you could buy it online and stil got it on time. Ang the gmaes @CAPS2 talking about are mind games and prizes that make think harder. Also you actually go to college through the computer. These are my final reasons that i think computers have apositive effect on people. I think you should agree with me and I hope you will computers have a positive effect on people. I dont really se a negative effect that comes out of them. Accept for when hackeers try to hack into your computer. so agree with me and my reason on how computers have a positive effect on people.'
+text = '"%s"' % new_essay
+
+clipboard = os.popen("echo %s | pylanguagetool" % text).read()
+
+#print("echo %s | pylanguagetool" % text)
+
+
+pylanguagetool.get_input_text()
+
+'''
+import ATD
+ATD.setDefaultKey('luyao@AES')
+errors = list(ATD.checkDocument('This are ok'))
+for error in errors:
+    print("%s error for: %s **%s**" % (error.type, error.precontext, error.string))
+    print("some suggestions: %s" % (", ".join(error.suggestions),))
+
+list(ATD.checkDocument('This are ok', 'luyao@AES'))
+
+metrics = ATD.stats("This are good")
+print([str(m) for m in metrics])
+'''

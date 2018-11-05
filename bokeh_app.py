@@ -1,31 +1,22 @@
-from numpy import linspace
+
 import numpy as np
-from scipy.stats.kde import gaussian_kde
 import dill
-from bokeh.models import ColumnDataSource
-from bokeh.plotting import figure
-from bokeh.io import curdoc, show
-import colorcet as cc
-import warnings
 from flask import Flask, render_template, request
-from bokeh.embed import components
-from bokeh.models import Range1d
 import re, collections
-from sklearn.feature_extraction.text import TfidfVectorizer
 import nltk
 from nltk.tokenize import sent_tokenize
 from nltk.stem import WordNetLemmatizer
 from nltk.corpus import wordnet
-from sklearn.ensemble import GradientBoostingRegressor
+from scipy import stats
+import os
 
-warnings.filterwarnings('ignore')
 
 bokeh_app= Flask(__name__)
 
 ##################################################
 ###############FIGURE CREATION ###################
 ##################################################
-
+'''
 def styling(figure):
     figure.title.text = "Feature Index Comparison with the Population"
     figure.title.align = 'center'
@@ -44,12 +35,12 @@ def styling(figure):
 
     return figure
 
-'''
+
 def joy(category, data, scale):
     y = [(category, 0)]
     y.extend(list(zip([category]*len(data), scale*data)))
     return y
-'''
+
 
 def joy(category, data, scale):
     f = data
@@ -72,6 +63,7 @@ def create_figures(data, features):
         xMax.append(xmax)
     p1.x_range = Range1d(0,max(xMax))
     return styling(p1)
+'''
 
 def data_prep(data, category):
     col_names = ['essay_set', 'count_lemma', 'sentence_number', 'spelling_error', 'total word_count', 'adj_count',
@@ -205,6 +197,21 @@ def count_spell_error(essay):
 
     return mispell_count
 
+'''
+def spell_errors(essay):
+    clean_essay = re.sub(r'\W', ' ', str(essay).lower())
+    clean_essay = re.sub(r'[0-9]', '', clean_essay)
+
+    mispells = []
+
+    words = clean_essay.split()
+    big_dict = get_big_dict()
+    for word in words:
+        if not word in big_dict:
+            mispells.append(word)
+    return {'spelling_errors' : mispells}
+'''
+
 ###Number of Nouns, Verbs, adj, adv. in an essay
 def count_pos(essay):
     tokenized_sentences = tokenize(essay)
@@ -255,17 +262,20 @@ PREDICTIONS USING GRADIENT BOOSTING REGRESSOR
 import pickle
 
 def predictions_gbr(x_test, category):
-    if category == 1:
+    labels = dill.load(open('labels.pkd', 'rb'))
+    if category[0] == 'Prompt1':
         score_model = pickle.load(open('score_model_set1.pickle', 'rb'))
         pred = score_model.predict(x_test)
         y_upper = pred+2*(0.6106829419850511**0.5)
         y_lower = pred-2*(0.6106829419850511**0.5)
+        y_train = labels.loc[labels['essay_set']==1]['domain1_score']
     else:
         score_model = pickle.load(open('score_model_set5.pickle', 'rb'))
         pred = score_model.predict(x_test)
         y_upper = pred+2*(0.28391495746239453**0.5)
         y_lower = pred-2*(0.28391495746239453**0.5)
-    return {'predicted score: ': pred, 'grade interval (90%)': (y_lower, y_upper)}
+        y_train = labels.loc[labels['essay_set'] == 5]['domain1_score']
+    return {'predicted score: ': round(pred[0]), 'grade interval (90%)': (round(y_lower[0]), round(y_upper[0])), 'percentile': round(stats.percentileofscore(y_train, pred),2)}
 
 ##################################################################################################
 #################################################################################################
@@ -283,17 +293,23 @@ def index():
 def show_results():
     full_feature = dill.load(open('full_features_df.pkd', 'rb'))
     category = request.form.getlist('check')
-    feature_1or5_df = data_prep(full_feature, category)
-    features  = request.form.getlist('select')
+    #feature_1or5_df = data_prep(full_feature, category)
+    #features  = request.form.getlist('select')
     new_essay = request.form['text']
     feature_values_list, feature_values_dict = create_features(new_essay, feature_functions)
 
-    plot = create_figures(feature_1or5_df, features)
+    #plot = create_figures(feature_1or5_df, features)
 
     predictions_dict = predictions_gbr(np.reshape(feature_values_list, (1,-1)), category)
-    script2, div2 = components(plot)
 
-    return render_template('about.html', predictions_dict = predictions_dict, feature_values_dict = feature_values_dict, script2=script2, div2=div2) #ticker_name=ticker_name, col_active0=col_active0) #col_active1=col_active1,
+    #script2, div2 = components(plot)
+    text = '"%s"' % new_essay
+    s = os.popen("echo %s | pylanguagetool" % text).read()
+    clipboard = s.replace('\n', '<br />')
+
+    return render_template('about.html', clipboard = "%s" % clipboard, predictions_dict = predictions_dict, feature_values_dict = feature_values_dict)#, script2=script2, div2=div2) #ticker_name=ticker_name, col_active0=col_active0) #col_active1=col_active1,
+
+
 
 if __name__ == '__main__':
     bokeh_app.run(port=5000)
