@@ -297,14 +297,14 @@ def show_results():
 
     #plot = create_figures(feature_1or5_df, features)
 
-    #predictions_dict = predictions_gbr(np.reshape(feature_values_list, (1,-1)), category)
+    predictions_dict = predictions_gbr(np.reshape(feature_values_list, (1,-1)), category)
 
     #script2, div2 = components(plot)
-    #text = '"%s"' % new_essay
-    #s = os.popen("echo %s | pylanguagetool" % text).read()
-    #clipboard = s.replace('\n', '<br />')
-#clipboard = "%s" % clipboard, predictions_dict = predictions_dict,
-    return render_template('about.html', feature_values_dict = feature_values_dict)#, script2=script2, div2=div2) #ticker_name=ticker_name, col_active0=col_active0) #col_active1=col_active1,
+    text = '"%s"' % new_essay
+    s = os.popen("echo %s | pylanguagetool" % text).read()
+    clipboard = s.replace('\n', '<br />')
+#
+    return render_template('about.html', clipboard = "%s" % clipboard, predictions_dict = predictions_dict, feature_values_dict = feature_values_dict)#, script2=script2, div2=div2) #ticker_name=ticker_name, col_active0=col_active0) #col_active1=col_active1,
 
 
 
