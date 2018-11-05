@@ -261,20 +261,20 @@ PREDICTIONS USING GRADIENT BOOSTING REGRESSOR
 import pickle
 
 def predictions_gbr(x_test, category):
-    labels = dill.load(open('labels.pkd', 'rb'))
+    #labels = dill.load(open('labels.pkd', 'rb'))
     if category[0] == 'Prompt1':
         score_model = pickle.load(open('score_model_set1.pickle', 'rb'))
         pred = score_model.predict(x_test)
         y_upper = pred+2*(0.6106829419850511**0.5)
         y_lower = pred-2*(0.6106829419850511**0.5)
-        y_train = labels.loc[labels['essay_set']==1]['domain1_score']
+        #y_train = labels.loc[labels['essay_set']==1]['domain1_score']
     else:
         score_model = pickle.load(open('score_model_set5.pickle', 'rb'))
         pred = score_model.predict(x_test)
         y_upper = pred+2*(0.28391495746239453**0.5)
         y_lower = pred-2*(0.28391495746239453**0.5)
-        y_train = labels.loc[labels['essay_set'] == 5]['domain1_score']
-    return {'predicted score: ': round(pred[0]), 'grade interval (90%)': (round(y_lower[0]), round(y_upper[0])), 'percentile': round(stats.percentileofscore(y_train, pred),2)}
+        #y_train = labels.loc[labels['essay_set'] == 5]['domain1_score']
+    return {'predicted score: ': round(pred[0]), 'grade interval (90%)': (round(y_lower[0]), round(y_upper[0]))}#, 'percentile': round(stats.percentileofscore(y_train, pred),2)}
 
 ##################################################################################################
 #################################################################################################
@@ -289,7 +289,7 @@ def index():
 
 @bokeh_app.route('/results', methods=['get','post'])
 def show_results():
-    full_feature = dill.load(open('full_features_df.pkd', 'rb'))
+    #full_feature = dill.load(open('full_features_df.pkd', 'rb'))
     category = request.form.getlist('check')
     #feature_1or5_df = data_prep(full_feature, category)
     #features  = request.form.getlist('select')
