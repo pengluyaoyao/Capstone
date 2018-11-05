@@ -1,2 +1,2 @@
 wordnet
-tokenizers/punkt/english.pickle
+punkt
