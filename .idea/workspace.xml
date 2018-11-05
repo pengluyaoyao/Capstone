@@ -77,11 +77,11 @@
           </provider>
         </entry>
       </file>
-      <file pinned="false" current-in-tab="false">
+      <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/bokeh_app.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="4650">
-              <caret line="310" lean-forward="true" selection-start-line="310" selection-end-line="310" />
+            <state relative-caret-position="501">
+              <caret line="317" column="3" lean-forward="true" selection-start-line="317" selection-start-column="3" selection-end-line="317" selection-end-column="3" />
               <folding>
                 <element signature="e#1#19#0" expanded="true" />
                 <marker date="1541440043147" expanded="true" signature="470:1267" ph="..." />
@@ -105,7 +105,7 @@
           </provider>
         </entry>
       </file>
-      <file pinned="false" current-in-tab="true">
+      <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/nltk.txt">
           <provider selected="true" editor-type-id="text-editor">
             <state>
@@ -449,6 +449,7 @@
   </component>
   <component name="ToolWindowManager">
     <frame x="60" y="30" width="1548" height="1177" extended-state="0" />
+    <editor active="true" />
     <layout>
       <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.14276358" />
       <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
@@ -559,30 +560,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/bokeh_app.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="4650">
-          <caret line="310" lean-forward="true" selection-start-line="310" selection-end-line="310" />
-          <folding>
-            <element signature="e#1#19#0" expanded="true" />
-            <marker date="1541440043147" expanded="true" signature="470:1267" ph="..." />
-            <marker date="1541440043147" expanded="true" signature="2010:2011" ph="..." />
-            <marker date="1541440043147" expanded="true" signature="2041:9736" ph="..." />
-            <marker date="1541440043147" expanded="true" signature="8472:8473" ph="..." />
-            <marker date="1541440043147" expanded="true" signature="9735:9736" ph="..." />
-            <marker date="1541440043147" expanded="true" signature="9887:10869" ph="..." />
-            <marker date="1541440043147" expanded="true" signature="10808:10811" ph="..." />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/requirements.txt">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="150">
-          <caret line="10" column="14" lean-forward="true" selection-start-line="10" selection-start-column="14" selection-end-line="10" selection-end-column="14" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/test.ipynb">
       <provider selected="true" editor-type-id="ipnb-editor">
         <state>
@@ -604,6 +581,30 @@
       <provider selected="true" editor-type-id="text-editor">
         <state>
           <caret column="7" lean-forward="true" selection-start-column="7" selection-end-column="7" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/requirements.txt">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="150">
+          <caret line="10" column="14" lean-forward="true" selection-start-line="10" selection-start-column="14" selection-end-line="10" selection-end-column="14" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/bokeh_app.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="501">
+          <caret line="317" column="3" lean-forward="true" selection-start-line="317" selection-start-column="3" selection-end-line="317" selection-end-column="3" />
+          <folding>
+            <element signature="e#1#19#0" expanded="true" />
+            <marker date="1541440043147" expanded="true" signature="470:1267" ph="..." />
+            <marker date="1541440043147" expanded="true" signature="2010:2011" ph="..." />
+            <marker date="1541440043147" expanded="true" signature="2041:9736" ph="..." />
+            <marker date="1541440043147" expanded="true" signature="8472:8473" ph="..." />
+            <marker date="1541440043147" expanded="true" signature="9735:9736" ph="..." />
+            <marker date="1541440043147" expanded="true" signature="9887:10869" ph="..." />
+            <marker date="1541440043147" expanded="true" signature="10808:10811" ph="..." />
+          </folding>
         </state>
       </provider>
     </entry>
