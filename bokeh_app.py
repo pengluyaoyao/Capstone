@@ -274,7 +274,7 @@ def predictions_gbr(x_test, category):
         y_upper = pred+2*(0.28391495746239453**0.5)
         y_lower = pred-2*(0.28391495746239453**0.5)
         #y_train = labels.loc[labels['essay_set'] == 5]['domain1_score']
-    return {'predicted score: ': round(pred[0]), 'grade interval (90%)': (round(y_lower[0]), round(y_upper[0]))}#, 'percentile': round(stats.percentileofscore(y_train, pred),2)}
+    return {'predicted score: ': round(pred[0],2), 'grade interval (90%)': (round(y_lower[0],2), round(y_upper[0],2))}#, 'percentile': round(stats.percentileofscore(y_train, pred),2)}
 
 ##################################################################################################
 #################################################################################################
