@@ -9,3 +9,6 @@ pip==9.0.1
 nltk
 scipy
 pylanguagetool
+re
+collections
+numpy

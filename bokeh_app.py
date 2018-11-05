@@ -289,7 +289,6 @@ def index():
 
 
 @bokeh_app.route('/results', methods=['get','post'])
-
 def show_results():
     full_feature = dill.load(open('full_features_df.pkd', 'rb'))
     category = request.form.getlist('check')
