@@ -2,14 +2,13 @@
 import numpy as np
 import dill
 from flask import Flask, render_template, request
-import re, collections
+import regex, collections
 import nltk
 from nltk.tokenize import sent_tokenize
 from nltk.stem import WordNetLemmatizer
 from nltk.corpus import wordnet
 from scipy import stats
 import os
-
 
 bokeh_app= Flask(__name__)
 
@@ -94,7 +93,7 @@ def data_prep(data, category):
 PREPERATIONS
 '''
 def sentence_to_wordlist(raw_sentence):
-    clean_sentence = re.sub("[^a-zA-Z0-9]", " ", raw_sentence)
+    clean_sentence = regex.sub("[^a-zA-Z0-9]", " ", raw_sentence)
     tokens = nltk.word_tokenize(clean_sentence)
     return tokens
 
@@ -115,7 +114,7 @@ def tokenize(essay):
 def get_big_dict():
     big = open('big.txt').read()
 
-    words_ = re.findall('[a-z]+', big.lower())
+    words_ = regex.findall('[a-z]+', big.lower())
 
     big_dict = collections.defaultdict(lambda: 0)
     #creating correct word dictionary
@@ -184,8 +183,8 @@ def count_lemmas(essay):
     return lemma_count
 
 def count_spell_error(essay):
-    clean_essay = re.sub(r'\W', ' ', str(essay).lower())
-    clean_essay = re.sub(r'[0-9]', '', clean_essay)
+    clean_essay = regex.sub(r'\W', ' ', str(essay).lower())
+    clean_essay = regex.sub(r'[0-9]', '', clean_essay)
 
     mispell_count = 0
 
