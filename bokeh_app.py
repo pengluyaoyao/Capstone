@@ -214,7 +214,6 @@ def spell_errors(essay):
 ###Number of Nouns, Verbs, adj, adv. in an essay
 def count_pos(essay):
     tokenized_sentences = tokenize(essay)
-
     noun_count = 0
     adj_count = 0
     verb_count = 0
